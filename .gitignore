@@ -1,0 +1,12 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Android build output
+*.apk
+*.aab
+*.idsig
+
+# Editor / OS files
+.idea/
+.DS_Store
