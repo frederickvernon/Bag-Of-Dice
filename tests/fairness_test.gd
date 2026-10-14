@@ -95,11 +95,12 @@ func _report_progress() -> void:
 		print("  %d%% (%.0f s)" % [roundi(fraction * 100.0), (Time.get_ticks_msec() - _start_ms) / 1000.0])
 		_next_progress += 0.1
 	if total_done >= _throws_per_type * _types.size():
-		_print_report()
-		get_tree().quit()
+		# Exit code 1 if any die looks biased, for run_all.sh.
+		get_tree().quit(0 if _print_report() else 1)
 
 
-func _print_report() -> void:
+## Prints the report; returns true if no die looks biased.
+func _print_report() -> bool:
 	print("\n===== Fairness report (%.0f s) =====" % ((Time.get_ticks_msec() - _start_ms) / 1000.0))
 	var all_ok: bool = true
 	for type: String in _types:
@@ -120,6 +121,7 @@ func _print_report() -> void:
 			all_ok = _print_faces(type, s["counts"], _values(1, sides, 1), s["done"]) and all_ok
 	print("\nOverall: %s" % ("PASS — no die looks biased" if all_ok else "CHECK — at least one die looks biased (see above)"))
 	print("(With 7 types, one borderline result now and then is normal chance; re-run with more throws to confirm.)")
+	return all_ok
 
 
 ## Prints the frequency table and chi-square test for one die. Returns false

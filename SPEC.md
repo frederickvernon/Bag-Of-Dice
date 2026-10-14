@@ -176,17 +176,23 @@ Files in the app's private folder (`user://`):
 
 ## 16. Tests
 
-In the project (`tests/`):
+All in `tests/`. Run everything with `tests/run_all.sh` (about 3 minutes), or `tests/run_all.sh --quick` to skip the fairness test. App tests use throwaway `test_*.json` data files and refuse to run without them, so they never touch real sets, history or settings. Tests are excluded from the Android build.
 
-| Test | Checks |
+| Test | What it checks |
 |---|---|
-| Fairness test (`fairness_test.tscn`) | Thousands of throws per die type, chi-square per die |
-| Set storage test (`store_test.gd`) | 29 checks |
-| History test (`history_test.gd`) | 17 checks |
-
-| Feature | Spec | Status |
-|---|---|---|
-| Tests not yet in the project | Nine more tests exist only in Claude's temporary workspace and will be lost after the session unless moved into `tests/`: set create/roll/edit/delete flow, picking, the shaking cup, the shake detector, re-rolling while dice are shown, throwing straight from the hand, late re-throw timing, the d100 limit, the sound switch. Plus a one-command "run everything" script | OPEN |
+| Set storage (`store_test.gd`) | 29 checks: first run, save/reload, cleaning bad data, d100 counting, corrupt file, delete |
+| Roll history (`history_test.gd`) | 17 checks: 50-roll cap, newest first, reload, oversized/damaged files, clear, time display |
+| Shake detector (`shake_detector_test.gd`) | 12 checks: shakes throw; bump, tilt, flip and disarmed shaking don't; with and without gravity sensor |
+| Re-throw timing (`rethrow_timing_test.gd`) | A die re-thrown late in a roll gets the full time limit |
+| Start menu (`start_menu_test.gd`) | Opens on menu, silent warm-up, quick and custom rolls not saved, sets/settings/Back |
+| Set flow (`set_flow_test.gd`) | Create, roll, edit, delete a set; saved file matches; 20d6 rolls |
+| d100 limit (`d100_limit_test.gd`) | d100 counts as 2 in the editor and on the table |
+| Pick dice (`pick_dice_test.gd`) | Tap, untap, long-press lock, only picked dice thrown and logged, lock remembered, Back |
+| Throw from hand (`throw_from_hand_test.gd`) | Throw button after settling and straight away; all dice land |
+| Shake cup (`shake_cup_test.gd`) | 5 shakes: every die moves, none escapes, stopping the shake throws |
+| Re-roll (`reroll_test.gd`) | 10 re-rolls mid-lift and after lift; all dice land |
+| Sound switch (`sound_switch_test.gd`) | On by default, muting silences a roll, remembered next launch |
+| Fairness (`fairness_test.tscn`) | Thousands of throws per die type, chi-square per die |
 
 ## 17. Out of scope
 
@@ -202,5 +208,4 @@ In the project (`tests/`):
 ## Open items summary
 
 1. Release signing (only if sharing/publishing the app)
-2. Move the nine temporary tests into `tests/` with a run-everything script
-3. Confirm the `VERIFY ON DEVICE` items on the phone, especially shake feel, keyboard in the editor, Back gesture, icon and splash, and the first-roll pause
+2. Confirm the `VERIFY ON DEVICE` items on the phone, especially shake feel, keyboard in the editor, Back gesture, icon and splash, and the first-roll pause
