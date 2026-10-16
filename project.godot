@@ -22,6 +22,10 @@ boot_splash/image="res://assets/splash.png"
 config/icon="res://assets/icon.png"
 boot_splash/minimum_display_time=1200
 
+[autoload]
+
+Entitlements="*res://scripts/pro/entitlements.gd"
+
 [display]
 
 window/size/viewport_width=540

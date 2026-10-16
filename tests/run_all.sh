@@ -10,7 +10,8 @@
 
 cd "$(dirname "$0")/.." || exit 1
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
-DATA=(--sets-file=user://test_sets.json --history-file=user://test_history.json --settings-file=user://test_settings.json)
+DATA=(--sets-file=user://test_sets.json --history-file=user://test_history.json --settings-file=user://test_settings.json
+	--entitlements-file=user://test_entitlements.json --fake-store-file=user://test_fake_store.json)
 QUICK=0
 [ "${1:-}" = "--quick" ] && QUICK=1
 
@@ -43,10 +44,11 @@ rm -f "$HOME/Library/Application Support/Godot/app_userdata/Bag Of Dice/test_res
 echo "Importing project…"
 "$GODOT" --headless --path . --import >/dev/null 2>&1
 
-run_test "Set storage"       -s res://tests/store_test.gd
-run_test "Roll history"      -s res://tests/history_test.gd
-run_test "Shake detector"    -s res://tests/shake_detector_test.gd
-run_test "Re-throw timing"   -s res://tests/rethrow_timing_test.gd
+run_test "Set storage"       -s res://tests/store_test.gd -- "${DATA[@]}"
+run_test "Roll history"      -s res://tests/history_test.gd -- "${DATA[@]}"
+run_test "Shake detector"    -s res://tests/shake_detector_test.gd -- "${DATA[@]}"
+run_test "Re-throw timing"   -s res://tests/rethrow_timing_test.gd -- "${DATA[@]}"
+run_test "Entitlements"      -s res://tests/entitlements_test.gd -- "${DATA[@]}"
 run_test "Start menu"        -s res://tests/start_menu_test.gd -- "${DATA[@]}"
 run_test "Set flow"          -s res://tests/set_flow_test.gd -- "${DATA[@]}"
 run_test "d100 limit"        -s res://tests/d100_limit_test.gd -- "${DATA[@]}"
@@ -59,7 +61,7 @@ run_test "Settings & extras" -s res://tests/settings_extras_test.gd -- "${DATA[@
 run_test "Tap to roll"       -s res://tests/tap_to_roll_test.gd -- "${DATA[@]}"
 run_test "Tutorial"          -s res://tests/tutorial_test.gd -- "${DATA[@]}"
 if [ $QUICK -eq 0 ]; then
-	run_test "Fairness"      res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=2000
+	run_test "Fairness"      res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=2000 "${DATA[@]}"
 fi
 
 rm -f "$HOME/Library/Application Support/Godot/app_userdata/Bag Of Dice/test_results.log"

@@ -149,6 +149,25 @@ Files in the app's private folder (`user://`):
 | First-run tips | Until the first throw: over the table, "Tap the table to pick up the dice" with an animated tap ripple, then while holding the dice "Shake the phone, or flick up to throw" with an animated flick. Never block input. Text-only "Press Roll" / "press Throw" versions when Tap or swipe is off. Remembered once done; **Show tips again** in Settings brings them back | VERIFY ON DEVICE |
 | Warm-up throw | A silent, unlogged practice throw runs behind the menu to warm up physics and rendering, to avoid a stutter on the first real roll | VERIFY ON DEVICE |
 
+## 12b. Free & Pro
+
+One-time **Pro** unlock (`bag_of_dice_pro`, non-consumable). Real Google Play Billing is not built yet: everything runs on a fake store behind a billing interface, so the real store can be added later as one new provider. Rolling, fairness, history, quick roll, picking dice and all settings are free and never gated.
+
+| Feature | Spec | Status |
+|---|---|---|
+| Limits in one place | `scripts/pro/pro_config.gd`: free saved sets `3` (example sets count), free colours ivory, black, red, blue, green; Pro adds orange, yellow, teal, purple, pink; fake price `$3.99` | BUILT |
+| Entitlements | Autoload `Entitlements` is the only source of truth: `is_pro()`, `pro_changed`, `can_add_set()`, `can_duplicate_set()`, `is_colour_available()`, `purchase_pro()`, `restore_purchases()`. Built around product ids so more one-time products can be added later | BUILT |
+| Cached status | `user://entitlements.json` (`owned`, `confirmed_at`), safe-saved. Loaded at startup so the app works offline; the store's answer wins when it gives one, and a store error keeps the cache. Missing, damaged or wrongly shaped file = free (damaged kept as `.corrupt.json`) | BUILT |
+| Billing interface | `BillingProvider`: connect, query product (localised price text), purchase (SUCCESS / CANCELLED / PENDING / ALREADY_OWNED / ERROR), query owned, acknowledge | BUILT |
+| Fake store | `FakeBillingProvider`: every outcome, adjustable delay, offline mode, pending resolvable to success or failure, "owned" kept in `user://fake_store.json` so restore works across restarts. The only provider until the real one exists | BUILT |
+| Double tap | A second Buy while a purchase is under way (or once owned) does nothing | BUILT |
+| Grandfathered sets | Sets existing when the Pro update first runs stay usable for free; recorded in the sets file so a damaged status file can't grandfather more | OPEN |
+| Developer panel | Debug builds only: Pro on/off, next outcome, delay, resolve pending, reset fake store | OPEN |
+| Gating | Set limit, Duplicate (Pro badge), Pro colours (lock badge) with an upgrade sheet; never mid-roll | OPEN |
+| Upgrade screen, restore, tier display | Price from the store, loading / unavailable / purchasing / pending / success / error states; Restore purchases; "Free" or "Pro (thank you!)" in Settings; small start-menu entry | OPEN |
+| Losing Pro | Nothing deleted: sets beyond the limit locked (deletable, not usable), Pro colours kept on existing dice, last-used locked set falls back | OPEN |
+| Free example colours | New installs: Fireball red, RPG set blue | OPEN |
+
 ## 13. Screen, visuals & controls
 
 | Feature | Spec | Status |
@@ -198,6 +217,7 @@ All in `tests/`. Run everything on the Mac with `tests/run_all.sh` (about 3 minu
 | Shake cup (`shake_cup_test.gd`) | 5 shakes: every die moves, none escapes, stopping the shake throws |
 | Re-roll (`reroll_test.gd`) | 10 re-rolls mid-lift and after lift; all dice land |
 | Sound switch (`sound_switch_test.gd`) | On by default, muting silences a roll, remembered next launch |
+| Entitlements (`entitlements_test.gd`) | 23 checks: default free, cache, damaged/wrong-shape files, store answer vs cache, every purchase outcome, pending → declined / confirmed, acknowledgement, restore (none / restored / unavailable) across restarts, double tap, colour and set helpers |
 | Settings & extras (`settings_extras_test.gd`) | Vibration and fast-roll switches applied and saved, fast roll only while rolling, Duplicate (and Duplicate + Cancel), copying a roll as text |
 | Fairness (`fairness_test.tscn`) | Thousands of throws per die type, chi-square per die |
 
@@ -216,3 +236,5 @@ All in `tests/`. Run everything on the Mac with `tests/run_all.sh` (about 3 minu
 
 1. Release signing (only if sharing/publishing the app)
 2. Confirm the `VERIFY ON DEVICE` items on the phone, especially shake feel, keyboard in the editor, Back gesture, icon and splash, and the first-roll pause
+3. Free & Pro, remaining steps: developer panel, gating and limit sheets, upgrade screen / restore / tier display, downgrade behaviour and grandfathering
+4. Real Google Play Billing provider and plugin, Play Console product setup (needs a developer account)

@@ -5,10 +5,12 @@ extends SceneTree
 ## Tests that launch the app must use throwaway data files (run_all.sh passes
 ## them; they're deleted before and after each test):
 ##   -- --sets-file=user://test_sets.json --history-file=user://test_history.json
-##      --settings-file=user://test_settings.json
+##      --settings-file=user://test_settings.json --entitlements-file=user://test_entitlements.json
+##      --fake-store-file=user://test_fake_store.json
 
 const TestLog = preload("res://tests/test_log.gd")
-const FILE_ARGS: Array[String] = ["--sets-file=", "--history-file=", "--settings-file="]
+const FILE_ARGS: Array[String] = ["--sets-file=", "--history-file=", "--settings-file=",
+		"--entitlements-file=", "--fake-store-file="]
 
 var test_name: String = "TEST"
 ## If true, the test needs throwaway data files.
