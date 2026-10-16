@@ -1,7 +1,6 @@
 class_name SetDrawer
 extends BottomSheet
-## Bottom sheet listing the user's dice sets. Tap a card to pull that set out
-## onto the table; Edit opens it in the editor; "New set" starts a new one.
+## Bottom sheet of dice sets. Tapping a card puts that set on the table.
 
 signal set_chosen(set_id: String)
 signal edit_requested(set_id: String)
@@ -37,7 +36,6 @@ func _build_content(column: VBoxContainer) -> void:
 	column.add_child(_empty_hint)
 
 
-## Shows the sheet listing `sets`, with `current_id` highlighted.
 func open(sets: Array[Dictionary], current_id: String) -> void:
 	_rebuild(sets, current_id)
 	_show_sheet()
@@ -52,15 +50,13 @@ func _rebuild(sets: Array[Dictionary], current_id: String) -> void:
 		_list.add_child(_make_card(s, s["id"] == current_id))
 
 
-## One set: name, dice summary and colour dots; Edit button on the right.
-## The whole card is a button that pulls the set out.
+## The whole card is a button; Edit sits on top of it.
 func _make_card(set_data: Dictionary, is_current: bool) -> Button:
 	var card: Button = Button.new()
 	card.theme_type_variation = "CardButton"
 	card.custom_minimum_size.y = 128
 	if is_current:
-		# Looked up on the drawer (already in the themed UI); the new card
-		# isn't in the tree yet so can't see the app theme.
+		# Looked up on the drawer: the new card isn't in the themed tree yet.
 		var style: StyleBoxFlat = (get_theme_stylebox("normal", "CardButton") as StyleBoxFlat).duplicate()
 		style.border_color = UITheme.ACCENT
 		style.set_border_width_all(3)
@@ -68,8 +64,7 @@ func _make_card(set_data: Dictionary, is_current: bool) -> Button:
 	var id: String = set_data["id"]
 	card.pressed.connect(func() -> void: set_chosen.emit(id))
 
-	# Content laid over the button. It ignores the mouse so taps reach the
-	# card, except the Edit button, which takes its own taps.
+	# Overlay ignores the mouse so taps reach the card; only Edit takes its own.
 	var margin: MarginContainer = MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -1,23 +1,21 @@
 class_name SetEditor
 extends Control
-## Full-screen editor for one dice set: its name, and a row per die with
-## colour, type, optional label and a remove button. Quick-add buttons add a
-## die of each type (in the colour of the last die, so "3 red d6" is: pick
-## red once, then tap +d6 three times).
-##
+## Full-screen dice set editor. Quick-add buttons reuse the last die's colour,
+## so "3 red d6" is: pick red once, tap +d6 three times.
 ## Works on a copy; nothing changes until Save.
 
 signal saved(set_data: Dictionary)
 signal deleted(set_id: String)
 signal cancelled
-## Quick-roll mode: the player built a one-off roll (never saved).
+## Quick-roll mode only; the dice are never saved.
 signal quick_ready(dice: Array[Dictionary])
 
 var _set_id: String = ""
 var _is_new: bool = true
-## Building a one-off quick roll: no name, no saving, "Roll" instead of "Save".
+## One-off quick roll: no name, no saving, "Roll" instead of "Save".
 var _quick: bool = false
 var _name_label: Label
+var _duplicate_button: Button
 ## Working copy: [{ "type", "style", "color" (hex), "label" }]
 var _dice: Array[Dictionary] = []
 
@@ -56,9 +54,17 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation", 16)
 	margin.add_child(column)
 
+	var header: HBoxContainer = HBoxContainer.new()
+	column.add_child(header)
 	_title = Label.new()
 	_title.theme_type_variation = "HeaderLabel"
-	column.add_child(_title)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_title)
+	_duplicate_button = Button.new()
+	_duplicate_button.text = "Duplicate"
+	_duplicate_button.tooltip_text = "Make a copy of this set to change"
+	_duplicate_button.pressed.connect(duplicate_set)
+	header.add_child(_duplicate_button)
 
 	_name_label = _muted("Name")
 	column.add_child(_name_label)
@@ -71,7 +77,7 @@ func _ready() -> void:
 
 	_pick_toggle = CheckButton.new()
 	_pick_toggle.text = "Pick dice before each throw"
-	# Let the label wrap rather than push the whole editor off-screen.
+	# Wrap so the label can't push the editor off-screen.
 	_pick_toggle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_pick_toggle.custom_minimum_size.x = 0
 	_pick_toggle.add_theme_font_size_override("font_size", 26)
@@ -149,7 +155,7 @@ func is_open() -> bool:
 	return visible
 
 
-## Opens the editor on a copy of `set_data`, or on a blank new set if empty.
+## An empty `set_data` starts a blank new set.
 func open(set_data: Dictionary) -> void:
 	_set_quick(false)
 	_is_new = set_data.is_empty()
@@ -161,13 +167,13 @@ func open(set_data: Dictionary) -> void:
 	for d: Dictionary in set_data.get("dice", []):
 		_dice.append(d.duplicate())
 	_delete_button.visible = not _is_new
+	_duplicate_button.visible = not _is_new
 	_rebuild_rows()
 	visible = true
 	if _is_new:
 		_name_edit.grab_focus()
 
 
-## Opens the editor to build a one-off quick roll: just dice, then Roll.
 func open_quick() -> void:
 	_set_quick(true)
 	_is_new = true
@@ -176,8 +182,24 @@ func open_quick() -> void:
 	_pick_toggle.button_pressed = false
 	_dice.clear()
 	_delete_button.visible = false
+	_duplicate_button.visible = false
 	_rebuild_rows()
 	visible = true
+
+
+## Turns the edits so far into an unsaved "<name> (copy)". Cancel leaves the
+## original untouched.
+func duplicate_set() -> void:
+	_is_new = true
+	_set_id = DiceSetStore.new_id()
+	_title.text = "New set"
+	var copy_name: String = "%s (copy)" % _name_edit.text.strip_edges()
+	_name_edit.text = copy_name.left(DiceSetStore.MAX_NAME_LENGTH)
+	_delete_button.visible = false
+	_duplicate_button.visible = false
+	_name_edit.grab_focus()
+	_name_edit.select_all()
+	_validate()
 
 
 func _set_quick(quick: bool) -> void:
@@ -237,7 +259,7 @@ func _rebuild_rows() -> void:
 	_validate()
 
 
-## How many more physical dice fit (a d100 takes 2).
+## Physical dice still free (a d100 takes 2).
 func _room_left() -> int:
 	var used: int = 0
 	for d: Dictionary in _dice:
@@ -269,8 +291,7 @@ func _make_row(index: int) -> HBoxContainer:
 			type_picker.select(i)
 	type_picker.custom_minimum_size = Vector2(170, 72)
 	type_picker.clip_text = true
-	# Don't widen to the longest choice ("d6 · numbers"): it would push the
-	# row off-screen.
+	# Widening to "d6 · numbers" would push the row off-screen.
 	type_picker.fit_to_longest_item = false
 	type_picker.add_theme_font_size_override("font_size", 26)
 	type_picker.item_selected.connect(func(i: int) -> void:
@@ -303,7 +324,7 @@ func _make_row(index: int) -> HBoxContainer:
 	return row
 
 
-## Returns true if the set can be saved; otherwise shows why.
+## Shows the reason when the set can't be saved.
 func _validate() -> bool:
 	var problem: String = ""
 	if not _quick and _name_edit.text.strip_edges().is_empty():

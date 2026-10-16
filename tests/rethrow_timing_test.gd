@@ -1,7 +1,6 @@
 extends "res://tests/app_test.gd"
-## Regression test for the "double re-throw": a die re-thrown late in a roll
-## must get the full time limit to land, not be pulled back moments later.
-## Time limit 1.5 s; the d20 is forced to re-throw 1.4 s into the roll.
+## A die re-thrown late must get the full time limit to land, not be pulled
+## back moments later. Limit 1.5 s; the d20 re-throws at 1.4 s.
 
 const TICKS: int = 120  # physics steps per second
 

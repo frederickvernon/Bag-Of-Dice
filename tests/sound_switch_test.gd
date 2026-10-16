@@ -1,6 +1,5 @@
 extends "res://tests/app_test.gd"
-## The sound switch: on by default, muting silences a whole roll, and the
-## choice is remembered on the next launch.
+## Sound is on by default, muting silences a whole roll, and it's remembered.
 
 func _init() -> void:
 	test_name = "SOUND SWITCH"
@@ -12,8 +11,7 @@ func run() -> void:
 	var toggle: SoundToggle = main.get_node("UI/Root/SoundToggle")
 	var sounds: DiceSounds = main.get_node("DiceSounds")
 	var settings: AppSettings = main.get("_settings")
-	# (The sound engine itself is briefly off during the start menu's silent
-	# practice throw, so check the setting and the button.)
+	# The engine is muted during the menu's practice throw; check the setting.
 	check(toggle.button_pressed and settings.sound, "sound is on by default")
 
 	toggle.button_pressed = false  # same as a tap

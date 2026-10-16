@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://0wmd7d1lww3u"]
+[gd_scene load_steps=21 format=3 uid="uid://0wmd7d1lww3u"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/table.gd" id="2_table"]
@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://scripts/ui/start_menu.gd" id="14_menu"]
 [ext_resource type="Script" path="res://scripts/ui/settings_sheet.gd" id="15_settings"]
 [ext_resource type="Script" path="res://scripts/ui/menu_icon_button.gd" id="16_menubutton"]
+[ext_resource type="Script" path="res://scripts/dice_haptics.gd" id="17_haptics"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -75,6 +76,9 @@ script = ExtResource("11_picker")
 
 [node name="DiceSounds" type="Node" parent="."]
 script = ExtResource("12_sounds")
+
+[node name="DiceHaptics" type="Node" parent="."]
+script = ExtResource("17_haptics")
 
 [node name="UI" type="CanvasLayer" parent="."]
 

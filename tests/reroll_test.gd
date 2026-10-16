@@ -1,7 +1,6 @@
 extends "res://tests/app_test.gd"
-## Rolling again while the last result is being shown (both while the dice
-## are still lifting and after): every die must land back on the table.
-## Uses the RPG set (all seven types).
+## Re-rolling while the last result shows (mid-lift and after) with the RPG
+## set: every die must land back on the table.
 
 var _main: Node
 var _roller: DiceRoller

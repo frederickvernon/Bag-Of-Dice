@@ -1,7 +1,6 @@
 extends "res://tests/app_test.gd"
-## Throwing from the hand with the Throw button (no shake), both once the
-## dice have settled in the hand and straight away while they're still
-## being gathered. All dice must land on the table.
+## Throw button (no shake), after the dice settle in the hand and while still
+## gathering: all dice must land on the table.
 
 var _main: Node
 var _roller: DiceRoller

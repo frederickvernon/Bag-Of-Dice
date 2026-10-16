@@ -1,15 +1,13 @@
 class_name DiceFactory
 extends RefCounted
-## Builds dice entirely in code: collision shape, visible mesh, face labels and
-## the direction→value table the Die uses to read its result.
+## Builds dice in code: collision shape, mesh, face labels and the
+## direction→value table the Die reads its result from.
 ##
-## Every shape is defined by its face normals. Each face is a plane the same
-## distance from the centre, so the solid is symmetric about its centre and
-## its centre of mass sits exactly at the origin — no face is favoured.
+## Every face plane is the same distance from the centre, so the centre of
+## mass sits at the origin and no face is favoured.
 
 const TYPES: Array[String] = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"]
-## Face styles for dice that come in more than one style; the first is the
-## default (the most common real-world look). Other types have one style.
+## Face styles per type; the first is the default (the common real-world look).
 ##   d6:  "pips" (dots, like a standard d6) or "numbers"
 ##   d10: "zero" (0–9, the 0 counting as 10, like most real d10s) or "ten" (1–10)
 const STYLES: Dictionary = {
@@ -17,8 +15,7 @@ const STYLES: Dictionary = {
 	"d10": ["zero", "ten"],
 }
 const STYLE_NAMES: Dictionary = { "pips": "pips", "numbers": "numbers", "zero": "0–9", "ten": "1–10" }
-## Where the pips sit on each d6 face, in units of the pip spacing: the
-## standard layout, with 2, 3 and 6 running corner to corner.
+## Standard d6 pip positions in pip-spacing units (2, 3 and 6 run corner to corner).
 const PIP_LAYOUT: Dictionary = {
 	1: [Vector2(0, 0)],
 	2: [Vector2(-1, -1), Vector2(1, 1)],
@@ -30,16 +27,13 @@ const PIP_LAYOUT: Dictionary = {
 const DEFAULT_COLOR: Color = Color(0.95, 0.93, 0.85)
 const PHI: float = 1.6180339887  # golden ratio, used by the d12 and d20
 
-## Overall size of every die. 1.0 = a d6 with 1-unit edges; smaller dice
-## have more room to tumble on the table and in the hand.
+## Overall die size; 1.0 = a d6 with 1-unit edges. Smaller dice have more room to tumble.
 const SCALE: float = 0.8
-## Distance from centre to the furthest corner, per type, at SCALE 1.0
-## (d6 edge = 1 unit).
+## Centre-to-furthest-corner distance per type, at SCALE 1.0.
 const RADIUS: Dictionary = {
 	"d4": 1.1, "d6": 0.866, "d8": 0.9, "d10": 0.88, "d12": 0.92, "d20": 0.98,
 }
-## Width of the rounded-off edges, as a fraction of the die's radius. Visual
-## only — the collision shape keeps sharp edges.
+## Edge rounding as a fraction of the die's radius. Visual only; collision keeps sharp edges.
 const BEVEL_FRACTION: float = 0.07
 ## Bold version of Godot's built-in font, shared by every face label.
 static var _label_font: FontVariation
@@ -49,8 +43,8 @@ static var _glyph_cache: Dictionary = {}
 const D10_FACE_ELEVATION_DEG: float = 42.0
 
 
-## Returns the dice for one entry of a set. Usually one die; a d100 is two
-## d10s (tens first, then units). `style`: see STYLES ("" = the default).
+## Dice for one set entry: usually one, but a d100 is two d10s (tens, then units).
+## `style` is a STYLES entry; "" means the default.
 static func create(type: String, body_color: Color = DEFAULT_COLOR, style: String = "") -> Array[Die]:
 	if not is_valid_style(type, style):
 		style = default_style(type)
@@ -84,8 +78,7 @@ static func create(type: String, body_color: Color = DEFAULT_COLOR, style: Strin
 	return dice
 
 
-## How many physical dice one entry of `type` puts on the table (a d100 is
-## rolled as two d10s).
+## Physical dice per entry of `type` (a d100 is rolled as two d10s).
 static func dice_count(type: String) -> int:
 	return 2 if type == "d100" else 1
 
@@ -111,7 +104,7 @@ static func variants() -> Array[Dictionary]:
 	return list
 
 
-# --- Face normals --------------------------------------------------------
+# Face normals
 
 static func _d6_normals() -> Array[Vector3]:
 	return [Vector3.UP, Vector3.DOWN, Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]
@@ -126,8 +119,8 @@ static func _d8_normals() -> Array[Vector3]:
 	return n
 
 
-## Pentagonal trapezohedron: five faces tilted up, five tilted down, with the
-## lower ring rotated 36° so every face is a kite.
+## Pentagonal trapezohedron: five faces up, five down, the lower ring rotated 36°
+## so every face is a kite.
 static func _d10_normals() -> Array[Vector3]:
 	var n: Array[Vector3] = []
 	var e: float = deg_to_rad(D10_FACE_ELEVATION_DEG)
@@ -162,10 +155,9 @@ static func _d20_normals() -> Array[Vector3]:
 	return n
 
 
-# --- Builders ------------------------------------------------------------
+# Builders
 
-## Any die read from its top face. Opposite faces get values that "sum" the
-## standard way (1↔N, 2↔N-1, ...).
+## Any die read from its top face. Opposite faces pair up the standard way (1↔N, 2↔N-1, ...).
 static func _build_standard(type: String, normals: Array[Vector3], values: Array[int],
 		body_color: Color, ink: Color, two_digit: bool = false, style: String = "") -> Die:
 	var solid: Dictionary = _make_solid(normals, RADIUS[type] * SCALE)
@@ -189,9 +181,8 @@ static func _build_standard(type: String, normals: Array[Vector3], values: Array
 		var room: float = _inradius(poly, centre) - solid["bevel"]
 		var digits: int = text.replace(".", "").length()
 		var height: float = room * (1.45 if digits > 1 else 1.9)
-		# Point the top of the number at the furthest corner (the tip of a
-		# d10 kite; any corner for triangles and pentagons). Square faces use
-		# an edge instead, so a presented d6 sits square, not as a diamond.
+		# Number top points at the furthest corner (the d10 kite tip). The d6 uses an
+		# edge instead, so a presented d6 sits square rather than as a diamond.
 		var up: Vector3 = _furthest(poly, centre) - centre
 		if type == "d6":
 			up = (poly[0] + poly[1]) * 0.5 - centre
@@ -207,9 +198,8 @@ static func _build_standard(type: String, normals: Array[Vector3], values: Array
 	return die
 
 
-## The d4 is read from the corner pointing up. Each face shows the value of
-## each of its three corners, printed next to that corner, so whichever corner
-## is on top its number appears upright on all three visible faces.
+## The d4 is read from its top corner. Each face prints every corner's value next
+## to that corner, so the top value reads upright on all three visible faces.
 static func _build_d4(body_color: Color, ink: Color) -> Die:
 	var corners: Array[Vector3] = [
 		Vector3(1, 1, 1), Vector3(1, -1, -1), Vector3(-1, 1, -1), Vector3(-1, -1, 1),
@@ -220,8 +210,7 @@ static func _build_d4(body_color: Color, ink: Color) -> Die:
 	var solid: Dictionary = _make_solid(normals, RADIUS["d4"] * SCALE)
 	var die: Die = _new_die("d4", solid, body_color)
 	for i: int in corners.size():
-		# To present corner i, show a face that touches it (any face except
-		# the opposite one) with that corner at the top.
+		# Present corner i on any face touching it, with that corner at the top.
 		var show_face: int = (i + 1) % corners.size()
 		var show_normal: Vector3 = normals[show_face].normalized()
 		var to_corner: Vector3 = corners[i] * RADIUS["d4"] * SCALE / corners[i].length() \
@@ -249,9 +238,8 @@ static func _new_die(type: String, solid: Dictionary, body_color: Color) -> Die:
 	die.name = type.to_upper()
 	die.die_type = type
 	die.mass = 1.0
-	# When frozen (while presenting a result) the die is moved by code. Static
-	# mode makes those moves plain teleports with no momentum, so nothing
-	# carries over when it is unfrozen and thrown again.
+	# Code moves the frozen die while presenting a result. Static mode makes those
+	# moves teleports, so no momentum carries over when it is thrown again.
 	die.freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
 	# Continuous collision detection stops a fast die tunnelling through walls.
 	die.continuous_cd = true
@@ -275,23 +263,18 @@ static func _new_die(type: String, solid: Dictionary, body_color: Color) -> Die:
 	return die
 
 
-# --- Geometry helpers ----------------------------------------------------
+# Geometry helpers
 
-## Intersects one plane per normal (all at the same distance from the centre)
-## and returns the solid scaled so its furthest corner is `radius` from the
-## centre:
-##   "vertices": every corner
-##   "faces": each face's corners (same order as `normals`), counter-clockwise
-##            as seen from outside; "face_indices": the same as indices
-##   "normals": unit face normals; "bevel": edge rounding width
+## Intersects one equidistant plane per normal, scaled so the furthest corner is `radius` out.
+##   "vertices", "faces" (corners per face in `normals` order, CCW from outside),
+##   "face_indices" (same, as indices), "normals" (unit), "bevel" (edge rounding width)
 static func _make_solid(normals: Array[Vector3], radius: float) -> Dictionary:
 	var planes: Array[Plane] = []
 	for n: Vector3 in normals:
 		planes.append(Plane(n.normalized(), 1.0))
 	var raw: PackedVector3Array = Geometry3D.compute_convex_mesh_points(planes)
 
-	# Several planes meet at each corner, so the same point can appear more
-	# than once — remove the duplicates.
+	# Several planes meet at each corner, so drop duplicate points.
 	var verts: PackedVector3Array = PackedVector3Array()
 	for p: Vector3 in raw:
 		var dup: bool = false
@@ -346,10 +329,8 @@ static func _sort_ccw(indices: Array[int], points: PackedVector3Array, normal: V
 	return indices
 
 
-## Mesh with bevelled edges: each face is shrunk slightly towards its centre,
-## and the gaps along edges and at corners are filled with strips whose
-## shading blends between neighbouring faces. That soft highlight along every
-## edge is what makes the separate faces readable.
+## Bevelled mesh: faces are inset and the gaps filled with strips shaded between
+## neighbouring faces. That edge highlight is what makes the faces readable.
 static func _make_mesh(solid: Dictionary, body_color: Color) -> ArrayMesh:
 	var verts: PackedVector3Array = solid["vertices"]
 	var face_indices: Array[PackedInt32Array] = solid["face_indices"]
@@ -416,8 +397,7 @@ static func _make_mesh(solid: Dictionary, body_color: Color) -> ArrayMesh:
 
 	var mat: StandardMaterial3D = StandardMaterial3D.new()
 	mat.albedo_color = body_color
-	# Satin rather than shiny: a flat face turned to the light would otherwise
-	# flash white and hide its pips.
+	# Satin, not shiny: a face turned to the light would flash white and hide its pips.
 	mat.roughness = 0.62
 	mat.metallic_specular = 0.3
 	# A thin glossy coat on top, like polished plastic.
@@ -447,11 +427,9 @@ static func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
 	st.add_vertex(c)
 
 
-# --- Numbers ---------------------------------------------------------------
-# The numbers are flat text shapes (from TextMesh) merged into one extra
-# surface of the die's mesh, so a die is drawn as just two pieces (body +
-# numbers) however many faces it has — much cheaper on phones than a
-# separate text object per face.
+# Numbers
+# Labels are flat TextMesh shapes merged into one extra mesh surface, so a die is
+# two draw pieces however many faces it has. Much cheaper on phones.
 
 static func _begin_ink() -> SurfaceTool:
 	var st: SurfaceTool = SurfaceTool.new()
@@ -467,8 +445,7 @@ static func _add_text(ink: SurfaceTool, text: String, pos: Vector3, normal: Vect
 	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
 	var y: Vector3 = _flatten(up, normal)
-	# Text is built facing +Z: point +Z out of the face. Sit just above the
-	# surface to avoid flickering against it.
+	# Text is built facing +Z; point it out of the face, just above it to avoid z-fighting.
 	var xform: Transform3D = Transform3D(Basis(y.cross(normal), y, normal), pos + normal * 0.002)
 	ink.set_normal(normal)
 	if indices.is_empty():
@@ -504,8 +481,7 @@ static func _glyphs(text: String, height: float) -> Array:
 	if not _glyph_cache.has(key):
 		var tm: TextMesh = TextMesh.new()
 		tm.text = text
-		# The plain built-in font: its outlines are clean. (Artificial
-		# bolding makes outlines overlap, which TextMesh can't triangulate.)
+		# Plain built-in font: artificial bolding overlaps outlines, which TextMesh can't triangulate.
 		tm.font = ThemeDB.fallback_font
 		tm.font_size = 128
 		tm.pixel_size = height / 128.0
@@ -538,8 +514,7 @@ static func _get_label_font() -> FontVariation:
 	return _label_font
 
 
-## For each normal, the index of the normal pointing the opposite way.
-## Pairs get values from opposite ends of `values`, e.g. 1↔6, 2↔5, 3↔4.
+## Value per face; opposite faces take values from opposite ends of `values` (1↔6, 2↔5, 3↔4).
 static func _assign_opposite_values(normals: Array[Vector3], values: Array[int]) -> Array[int]:
 	var result: Array[int] = []
 	result.resize(normals.size())
@@ -575,8 +550,7 @@ static func _centroid(poly: PackedVector3Array) -> Vector3:
 	return c / poly.size()
 
 
-## Shortest distance from `centre` to any edge of the face — how much room a
-## label has.
+## Shortest distance from `centre` to a face edge, i.e. the room a label has.
 static func _inradius(poly: PackedVector3Array, centre: Vector3) -> float:
 	var best: float = INF
 	for i: int in poly.size():

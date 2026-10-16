@@ -1,14 +1,12 @@
 extends SceneTree
-## Tests for RollHistory: the 50-roll cap, newest-first order, saving and
-## loading, clearing, and damaged files. Uses its own file in user://, never
-## the app's real history, and deletes it afterwards.
+## RollHistory: 50-roll cap, order, save/load, clearing, damaged files.
+## Uses its own throwaway file, never the real history.
 ##
 ## Run from the project folder:
 ##   Godot --headless --path . -s res://tests/history_test.gd
 
 const PATH: String = "user://test_roll_history.json"
-## Number of checks below. If fewer run (e.g. a script failed to compile and
-## a test stopped early), the run counts as failed.
+## If fewer checks run (e.g. a test stopped early), the run fails.
 const EXPECTED_CHECKS: int = 17
 
 var _failures: int = 0
@@ -31,7 +29,7 @@ func _init() -> void:
 	quit(1 if _failures > 0 else 0)
 
 
-## A fake roll: `n` d6 dice all showing `value`, tagged by roll number.
+## `n` d6 all showing `value`.
 func _roll(number: int, value: int = 3, n: int = 2) -> Dictionary:
 	var results: Array[Dictionary] = []
 	for i: int in n:
@@ -44,7 +42,7 @@ func _test_cap_and_order() -> void:
 	var h: RollHistory = RollHistory.new(PATH)
 	h.load_entries()
 	_check(h.entries.is_empty(), "starts empty when there's no file")
-	for i: int in range(1, 56):  # 55 rolls
+	for i: int in range(1, 56):
 		h.add(_roll(i))
 	_check(h.entries.size() == 50, "keeps only 50 after 55 rolls")
 	_check(h.entries[0]["set_name"] == "Roll 55", "newest roll is first")

@@ -1,7 +1,6 @@
 extends "res://tests/app_test.gd"
-## Picking dice on the example Risk set (entries 0–2 are red "Attack", 3–4
-## ivory "Defend"): tap to pick, tap again to put back, long-press to lock,
-## only picked dice are thrown and logged, the lock is remembered.
+## Picking dice on the Risk set (0–2 "Attack", 3–4 "Defend"): tap to pick or
+## put back, long-press to lock; only picked dice are thrown and logged.
 
 var _main: Node
 var _roller: DiceRoller

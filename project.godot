@@ -14,10 +14,10 @@ config/name="Bag Of Dice"
 run/main_scene="res://main.tscn"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "Mobile")
-config/icon="res://assets/icon.png"
 boot_splash/bg_color=Color(0.2, 0.13, 0.08, 1)
-boot_splash/image="res://assets/splash.png"
 boot_splash/stretch_mode=4
+boot_splash/image="res://assets/splash.png"
+config/icon="res://assets/icon.png"
 boot_splash/minimum_display_time=1200
 
 [display]

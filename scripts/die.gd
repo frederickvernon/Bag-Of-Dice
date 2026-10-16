@@ -15,18 +15,13 @@ signal impact(die: Die, other: Node, speed: float)
 
 ## e.g. "d6", or "d10" for each half of a d100. Set by DiceFactory.
 var die_type: String = ""
-## Each entry: { "direction": Vector3 (in the die's local space), "value": int }.
-## The entry whose world-space direction points most nearly up is the result.
-## For most dice the directions are face normals; for the d4 they point at
-## the vertices, because a d4 is read from its top point.
-## Also "show_normal" / "show_up" (local): the face to turn toward the viewer
-## when presenting this result, and which way is "up" for its number.
+## { "direction": Vector3 (local), "value": int, "show_normal", "show_up" }. The direction
+## pointing most nearly up wins; it's a face normal, or a vertex for the d4 (read from its top).
+## show_normal/show_up: the face turned to the viewer when presenting, and its number's up.
 var faces: Array[Dictionary] = []
-## If the best direction is tilted more than this from straight up, the die is
-## "cocked" (leaning on a wall or another die) and has no clear result.
+## Tilted further than this from straight up, the die is cocked and has no result.
 var cocked_dot_threshold: float = cos(deg_to_rad(10.0))
-## Which entry of the roller's dice list this die belongs to (a d100 is two
-## dice sharing one index). Set by DiceRoller.
+## Entry in the roller's dice list (a d100's two dice share one). Set by DiceRoller.
 var group_index: int = 0
 ## Nudges used on the current roll. Managed by DiceRoller.
 var nudges: int = 0
@@ -35,8 +30,7 @@ var corners: PackedVector3Array = PackedVector3Array()
 
 var _rest_timer: float = 0.0
 var _moving_time: float = 0.0
-## Velocity before the latest physics step — by the time a collision is
-## reported, the solver has already slowed the die down.
+## Velocity before the latest step; by the time a collision is reported the solver has slowed the die.
 var _prev_velocity: Vector3 = Vector3.ZERO
 
 
@@ -69,8 +63,7 @@ func _on_body_entered(other: Node) -> void:
 
 ## Teleports the die and launches it.
 func throw(start_position: Vector3, start_rotation: Basis, lin_vel: Vector3, ang_vel: Vector3) -> void:
-	# Teleport first, while still frozen if it was being presented, then hand
-	# it back to physics.
+	# Teleport while still frozen (if it was being presented), then hand back to physics.
 	global_transform = Transform3D(start_rotation, start_position)
 	freeze = false
 	sleeping = false
@@ -129,9 +122,7 @@ func _top_face_index() -> int:
 	return best
 
 
-## World-space height of the die's lowest corner. A die lying on the table
-## has its lowest corner at table height; one resting on another die is
-## well above it.
+## World-space height of the lowest corner; well above table height means it's resting on another die.
 func get_lowest_point() -> float:
 	var lowest: float = INF
 	for c: Vector3 in corners:

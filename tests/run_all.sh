@@ -51,6 +51,8 @@ run_test "Throw from hand"   -s res://tests/throw_from_hand_test.gd -- "${DATA[@
 run_test "Shake cup"         -s res://tests/shake_cup_test.gd -- "${DATA[@]}"
 run_test "Re-roll"           -s res://tests/reroll_test.gd -- "${DATA[@]}"
 run_test "Sound switch"      -s res://tests/sound_switch_test.gd -- "${DATA[@]}"
+run_test "Settings & extras" -s res://tests/settings_extras_test.gd -- "${DATA[@]}"
+run_test "Tap to roll"       -s res://tests/tap_to_roll_test.gd -- "${DATA[@]}"
 if [ $QUICK -eq 0 ]; then
 	run_test "Fairness"      res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=2000
 fi

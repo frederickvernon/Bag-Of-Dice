@@ -99,6 +99,7 @@ For games where only some of a set's dice are thrown at a time, e.g. one Risk se
 | A set | Name (max `40` chars), pick-dice option, list of dice. Each die: type and face style, colour, optional label (max `24` chars) | BUILT |
 | Dice limit | Max `20` physical dice per set. A d100 counts as 2 (max 10 d100s). "+ d100" disabled when only one place is left; switching a die to d100 in a full set is refused with an explanation | BUILT |
 | Drawer | Set-name button (bottom left) slides up a sheet listing sets as cards: name, colour dots, summary (e.g. "8d6"), "· pick dice" where relevant. Current set outlined. Tap a card to pull the set out; tap outside or Close to dismiss | BUILT |
+| Duplicate | **Duplicate** button at the top of the editor turns the set being edited into a new unsaved copy named "<name> (copy)"; Save adds it, Cancel discards it | BUILT |
 | Editor | Name, pick-dice switch, a row per die (colour swatch, type + style, label, remove), quick-add buttons per type. New die takes the previous die's colour. Save disabled until there's a name and at least one die. Delete asks for confirmation. Saving puts the set on the table | BUILT |
 | Example sets | First launch only. **Fireball:** 8 orange d6. **Risk:** 3 red d6 "Attack" + 2 ivory d6 "Defend", pick dice on. **RPG set:** one of each type in purple, pick dice on | BUILT |
 | Remembers last set | App reopens on the last-used set | BUILT |
@@ -109,6 +110,7 @@ For games where only some of a set's dice are thrown at a time, e.g. one Risk se
 |---|---|---|
 | The log | Last `50` rolls, newest first; oldest dropped when a new roll goes over. Fixed in code (not a setting) and applied on load too, so the saved file never holds more than 50 | BUILT |
 | Each entry | Set name, time ("14:32", "Yesterday 14:32", or "11 Oct 14:32"), one chip per die in the die's colour with value and label, total. Mixed rolls show the type on each chip | BUILT |
+| Copy a roll | **Copy** button on each entry copies it as plain text, e.g. `Risk (14:32): Attack (d6): 6  5, Defend (d6): 4  (total 15)`; the button briefly reads "Copied" | BUILT |
 | Clear history | Asks "Clear all N rolls? This can't be undone." first | BUILT |
 | Plain data | Each roll stored as structured data (time, set, total, each die's type, value, colour, label, d100 parts) so game rules can be layered on later without a rewrite | BUILT |
 
@@ -120,7 +122,7 @@ Files in the app's private folder (`user://`):
 |---|---|
 | `dice_sets.json` | Every set, plus the last-used set |
 | `roll_history.json` | Up to 50 rolls |
-| `settings.json` | Sound on/off |
+| `settings.json` | Sound, vibration and fast-roll switches |
 
 | Feature | Spec | Status |
 |---|---|---|
@@ -140,7 +142,10 @@ Files in the app's private folder (`user://`):
 |---|---|---|
 | Start menu | Shown after the splash every launch, over the splash art: **Continue: <current dice>**, Quick roll, Dice sets, History, Settings. The table loads behind it | BUILT |
 | Quick roll | One-tap **1d6**, **2d6**, **1d20**, plus **Custom** (the editor without name or saving; its button reads Roll). Quick rolls are never saved as sets and show as "Quick roll" in the history | BUILT |
-| Settings | Bottom sheet; currently Sound effects. Kept in sync with the table's speaker button. Future options (haptics, fast roll, text size, backup) go here | BUILT |
+| Settings | Bottom sheet with switches for **Sound effects** (kept in sync with the table's speaker button), **Vibration** and **Fast roll**. All saved | BUILT |
+| Vibration | Short buzz when dice hit the table, rim or each other (`8–30 ms`, stronger for harder hits), at most one per `60 ms`. Not while shaking in the hand or during the warm-up throw. On by default. On Android 13+ buzzes are sent as media vibrations through the Android API, so they still play when the phone's touch vibration is off (Godot's built-in vibrate counts as touch feedback and gets dropped) | BUILT (confirmed on device) |
+| Fast roll | Off by default. While dice roll, the physics plays out `1.75×` faster (same steps, more per frame, so results are unaffected), and results lift in `0.3 s` instead of `0.6 s` | VERIFY ON DEVICE |
+| Tap or swipe to roll | On by default (switch in Settings). A quick tap on the table does what the main button does: Roll / Pick up, then Throw. A quick upward flick (at least `90 px` within `0.6 s`) throws held dice, harder for faster flicks (`400–2500 px/s` maps to throw power 0–1, like shake strength; never affects which face lands). Drags, long presses and taps while picking or rolling don't roll. Hints read "Tap to roll" / "Shake, flick up or tap to throw" | VERIFY ON DEVICE |
 | Warm-up throw | A silent, unlogged practice throw runs behind the menu to warm up physics and rendering, to avoid a stutter on the first real roll | VERIFY ON DEVICE |
 
 ## 13. Screen, visuals & controls
@@ -169,7 +174,7 @@ Files in the app's private folder (`user://`):
 
 | Feature | Spec | Status |
 |---|---|---|
-| Export | Android preset for 64-bit ARM, package `com.btgog.bagofdice`, debug-signed, one-click install from the Godot editor. No special permissions. ETC2/ASTC texture compression enabled | BUILT (confirmed on device) |
+| Export | Android preset for 64-bit ARM, package `com.btgog.bagofdice`, debug-signed, one-click install from the Godot editor. Only permission: vibrate (granted automatically at install). ETC2/ASTC texture compression enabled | BUILT (confirmed on device) |
 | App icon | Leather dice bag with dice on felt. Adaptive icon (picture shrunk inside the safe zone, felt mirrored to fill the margin) plus a 192×192 legacy icon. Files in `assets/` | VERIFY ON DEVICE |
 | Splash screen | Top-down felt tray with the dice bag. Fills the screen (cover); on phones taller than 9:16 the sides of the wooden frame are trimmed. Shown at least `1.2 s`. Alternative available: fit to screen with wood-coloured bands | VERIFY ON DEVICE |
 | Release signing | Only needed to share beyond your own phone or publish | OPEN |
@@ -192,6 +197,7 @@ All in `tests/`. Run everything with `tests/run_all.sh` (about 3 minutes), or `t
 | Shake cup (`shake_cup_test.gd`) | 5 shakes: every die moves, none escapes, stopping the shake throws |
 | Re-roll (`reroll_test.gd`) | 10 re-rolls mid-lift and after lift; all dice land |
 | Sound switch (`sound_switch_test.gd`) | On by default, muting silences a roll, remembered next launch |
+| Settings & extras (`settings_extras_test.gd`) | Vibration and fast-roll switches applied and saved, fast roll only while rolling, Duplicate (and Duplicate + Cancel), copying a roll as text |
 | Fairness (`fairness_test.tscn`) | Thousands of throws per die type, chi-square per die |
 
 ## 17. Out of scope

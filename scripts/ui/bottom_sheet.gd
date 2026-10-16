@@ -1,8 +1,7 @@
 class_name BottomSheet
 extends Control
-## A panel that slides up from the bottom of the screen over a dimmed
-## background, with a title and a Close button. Tapping the dimmed area also
-## closes it. Subclasses add their content in _build_content().
+## Panel that slides up over a dimmed background; tapping the dim closes it.
+## Subclasses add content in _build_content().
 
 signal closed
 
@@ -57,7 +56,6 @@ func _ready() -> void:
 	_build_content(column)
 
 
-## Override to add the sheet's content below the header.
 func _build_content(_column: VBoxContainer) -> void:
 	pass
 
@@ -66,7 +64,7 @@ func set_title(text: String) -> void:
 	_title.text = text
 
 
-## True while showing, false as soon as it starts sliding away.
+## False as soon as it starts sliding away.
 func is_open() -> bool:
 	return visible and not _closing
 
@@ -78,7 +76,6 @@ func close() -> void:
 	closed.emit()
 
 
-## Shows the sheet, sliding it up.
 func _show_sheet() -> void:
 	visible = true
 	_slide(true)
@@ -109,7 +106,7 @@ func _slide(show_sheet: bool) -> void:
 			_closing = false)
 
 
-## A small rounded patch of colour (e.g. a die colour dot or result chip).
+## Rounded colour patch, e.g. a die colour dot or result chip.
 static func color_box(color: Color, radius: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = color

@@ -1,26 +1,30 @@
 extends Node3D
-## Main screen. Opens on the start menu (continue, quick roll, dice sets,
-## history, settings) with the table loaded behind it.
-## On the table: open Sets to pull a dice set out of the drawer, press Roll to
-## arm, then shake the phone (or press Throw) to throw. Sets with "pick dice"
-## on show Pick up first, to choose which of the set's dice to throw. Once everything has
-## settled the result is logged to the history, the dice are lifted up to
-## show it, and rolling disarms. History shows past rolls.
+## Main screen. Opens on the start menu with the table loaded behind it.
+## Roll arms, then a shake (or Throw) throws; "pick dice" sets show Pick up first to choose dice.
+## Once settled, the result is logged to history, the dice are lifted to show it, and rolling disarms.
 ##
-## Desktop testing: in a debug run on a computer, hold S to fake a shake.
-## Space presses the Roll / Throw button; Escape acts as Android's Back.
+## Desktop (debug build): hold S to fake a shake, Space presses Roll / Throw, Escape is Android Back.
 ##
-## Headless self-test: run with user args --autoroll=N (and optionally
-## --set=K to pick the K-th saved set) to throw N times, print the results
-## and quit. --autoroll or --set skip the start menu. --sets-file=user://other.json, --history-file=user://… and
-## --settings-file=user://… use different files (so tests never touch the
-## real ones).
+## Self-test user args: --autoroll=N rolls N times then quits; --set=K picks the K-th set
+## (either skips the menu). --sets-file / --history-file / --settings-file keep tests off real data.
 
 ## IDLE: waiting for Roll / Pick up. PICKING: choosing dice to throw.
 ## ARMED: listening for a shake. ROLLING: dice moving.
 enum State { IDLE, PICKING, ARMED, ROLLING }
 
 const ARMED_HINT: String = "Shake to roll\nor tap Throw"
+const ARMED_HINT_TAP: String = "Shake, flick up or tap\nto throw"
+## A press that moves further than this (pixels) or lasts longer than
+## TAP_MAX_TIME is a drag or hold, not a tap on the table.
+const TAP_SLOP: float = 24.0
+const TAP_MAX_TIME: float = 0.4
+## An upward flick at least this long (pixels) and this quick (seconds) throws
+## held dice; its speed (pixels/s, between the two values) sets the throw power.
+const SWIPE_MIN_DISTANCE: float = 90.0
+const SWIPE_MAX_TIME: float = 0.6
+const SWIPE_SPEED_RANGE: Vector2 = Vector2(400.0, 2500.0)
+## Engine time scale while rolling with Fast roll on.
+const FAST_ROLL_SPEED: float = 1.75
 const PICK_HINT: String = "Tap the dice to throw\nHold a die to lock it"
 
 @onready var _roller: DiceRoller = $DiceRoller
@@ -29,6 +33,7 @@ const PICK_HINT: String = "Tap the dice to throw\nHold a die to lock it"
 @onready var _hand: DiceHand = $DiceHand
 @onready var _picker: DicePicker = $DicePicker
 @onready var _sounds: DiceSounds = $DiceSounds
+@onready var _haptics: DiceHaptics = $DiceHaptics
 @onready var _camera: Camera3D = $Camera3D
 @onready var _result_label: Label = $UI/Root/ResultLabel
 @onready var _sets_button: Button = $UI/Root/BottomBar/SetsButton
@@ -49,15 +54,16 @@ var _settings: AppSettings = AppSettings.new()
 var _current_set: Dictionary = {}
 ## Id of the saved set on the table ("" for a quick roll or nothing).
 var _current_set_id: String = ""
-## A hidden practice throw behind the start menu, to warm up physics and
-## rendering so the player's first roll doesn't stutter. Not logged or heard.
+## A silent, unlogged practice throw behind the start menu so the first real roll doesn't stutter.
 var _warming: bool = false
-## Whether the current set asks the player to pick dice before each throw.
+## The current set asks the player to pick dice before each throw.
 var _pick_mode: bool = false
-## Locked (always-picked) entries per set, for this session: set id -> {entry: true}.
+## Locked (always-picked) entries per set, session only: set id -> {entry: true}.
 var _locks: Dictionary = {}
 var _state: State = State.IDLE
 var _autoroll_remaining: int = 0
+var _press_pos: Vector2 = Vector2.ZERO
+var _press_ms: int = -1
 
 
 func _ready() -> void:
@@ -80,7 +86,7 @@ func _ready() -> void:
 	_editor.quick_ready.connect(func(dice: Array[Dictionary]) -> void:
 		_load_quick(dice)
 		_show_table())
-	# Cancelling the editor just reveals the drawer (or menu) underneath.
+	# No cancel handler: closing the editor reveals the drawer or menu underneath.
 	_menu.continue_pressed.connect(_show_table)
 	_menu.quick_roll.connect(func(types: Array[String]) -> void:
 		var dice: Array[Dictionary] = []
@@ -91,8 +97,11 @@ func _ready() -> void:
 	_menu.custom_quick_pressed.connect(func() -> void: _editor.open_quick())
 	_menu.sets_pressed.connect(_open_drawer)
 	_menu.history_pressed.connect(_open_history)
-	_menu.settings_pressed.connect(func() -> void: _settings_sheet.open(_settings.sound))
-	_settings_sheet.sound_changed.connect(_set_sound)
+	_menu.settings_pressed.connect(func() -> void: _settings_sheet.open(_settings))
+	_settings_sheet.changed.connect(_on_setting_changed)
+	_roller.die_impact.connect(func(kind: String, speed: float) -> void:
+		if not _warming:
+			_haptics.play_impact(kind, speed))
 	_menu_button.pressed.connect(_show_menu)
 
 	for arg: String in OS.get_cmdline_user_args():
@@ -106,6 +115,7 @@ func _ready() -> void:
 	_history.load_entries()
 	_settings.load_settings()
 	_sounds.enabled = _settings.sound
+	_haptics.enabled = _settings.haptics
 	_sound_toggle.set_pressed_no_signal(_settings.sound)
 	_sound_toggle.toggled.connect(_set_sound)
 	var start_id: String = _store.last_set_id
@@ -145,6 +155,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _state == State.PICKING and _picker.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
+	if _settings.tap_to_roll:
+		var gesture: Dictionary = _table_gesture(event)
+		if gesture.get("kind") == "tap":
+			get_viewport().set_input_as_handled()
+			if (_state == State.IDLE or _state == State.ARMED) and not _roll_button.disabled:
+				_on_roll_button_pressed()
+			return
+		if gesture.get("kind") == "swipe":
+			get_viewport().set_input_as_handled()
+			if _state == State.ARMED:
+				_start_roll(gesture["power"])
+			return
 	if event.is_action_pressed("ui_cancel"):
 		_go_back()
 	elif event.is_action_pressed("ui_accept") and not _roll_button.disabled \
@@ -153,15 +175,40 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_roll_button_pressed()
 
 
+## On the release of a press on the table: { "kind": "tap" }, an upward flick
+## { "kind": "swipe", "power": 0–1 }, or {} for anything else. Presses on buttons
+## and sheets never get here (the UI takes them). Touch arrives as emulated mouse.
+func _table_gesture(event: InputEvent) -> Dictionary:
+	if not event is InputEventMouseButton or (event as InputEventMouseButton).button_index != MOUSE_BUTTON_LEFT:
+		return {}
+	var mb: InputEventMouseButton = event
+	if mb.pressed:
+		_press_pos = mb.position
+		_press_ms = Time.get_ticks_msec()
+		return {}
+	if _press_ms < 0:
+		return {}
+	var seconds: float = (Time.get_ticks_msec() - _press_ms) / 1000.0
+	var moved: Vector2 = mb.position - _press_pos
+	_press_ms = -1
+	if moved.length() <= TAP_SLOP:
+		return { "kind": "tap" } if seconds <= TAP_MAX_TIME else {}
+	var upward: bool = -moved.y >= SWIPE_MIN_DISTANCE and -moved.y > absf(moved.x) * 1.2
+	if upward and seconds <= SWIPE_MAX_TIME:
+		var speed: float = moved.length() / maxf(seconds, 0.016)
+		return { "kind": "swipe", "power": clampf(inverse_lerp(SWIPE_SPEED_RANGE.x, SWIPE_SPEED_RANGE.y, speed), 0.0, 1.0) }
+	return {}
+
+
 func _notification(what: int) -> void:
 	# Android's Back button / gesture.
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_go_back()
 
 
-## Back closes whatever is on top (confirmation, editor, sheet), then on the
-## table cancels picking / arming, then goes to the start menu; Back on the
-## menu leaves the app.
+## Closes whatever is on top, else cancels picking / arming, else opens the menu;
+## from the menu it quits.
+## Back on the menu quits.
 func _go_back() -> void:
 	if _settings_sheet.is_open():
 		_settings_sheet.close()
@@ -182,7 +229,7 @@ func _go_back() -> void:
 		_show_menu()
 
 
-# --- Start menu ------------------------------------------------------------
+# Start menu
 
 func _show_menu() -> void:
 	if _state == State.ARMED or _state == State.PICKING:
@@ -208,14 +255,32 @@ func _warm_up() -> void:
 func _end_warm_up() -> void:
 	_warming = false
 	_sounds.enabled = _settings.sound
+	_haptics.enabled = _settings.haptics
 
 
-# --- Dice sets -------------------------------------------------------------
+# Dice sets, settings and history
 
 func _open_drawer() -> void:
 	if _state == State.ARMED or _state == State.PICKING:
 		_disarm()
 	_drawer.open(_store.sets, _current_set_id)
+
+
+func _on_setting_changed(key: String, on: bool) -> void:
+	match key:
+		"sound":
+			_set_sound(on)
+		"haptics":
+			_settings.haptics = on
+			_haptics.enabled = on
+			_settings.save()
+		"tap_to_roll":
+			_settings.tap_to_roll = on
+			_settings.save()
+			_put_on_table(_current_set, _current_set_id)  # refresh the hint text
+		"fast_roll":
+			_settings.fast_roll = on
+			_settings.save()
 
 
 ## Sound on/off, from the table's speaker button or the settings sheet.
@@ -247,7 +312,6 @@ func _on_set_saved(set_data: Dictionary) -> void:
 	if stored.is_empty():
 		return
 	_locks.erase(stored["id"])  # its dice may have changed
-	# Pull the saved set straight out onto the table.
 	_load_set(stored["id"])
 	_drawer.close()
 	_show_table()
@@ -291,7 +355,9 @@ func _put_on_table(set_data: Dictionary, id: String) -> void:
 		_result_label.text = "Open Sets to make a dice set"
 	else:
 		_sets_button.text = set_data["name"]
-		_result_label.text = "%s\nPress %s" % [DiceSetStore.summary(set_data), "Pick up" if _pick_mode else "Roll"]
+		var action: String = "pick up" if _pick_mode else "roll"
+		_result_label.text = "%s\n%s" % [DiceSetStore.summary(set_data),
+				("Tap to %s" % action) if _settings.tap_to_roll else ("Press %s" % action.capitalize())]
 
 
 ## Stop picking / listening for a shake and put the dice back on the table.
@@ -299,7 +365,7 @@ func _disarm() -> void:
 	_put_on_table(_current_set, _current_set_id)
 
 
-# --- Rolling -----------------------------------------------------------------
+# Rolling
 
 func _on_roll_button_pressed() -> void:
 	match _state:
@@ -337,7 +403,6 @@ func _on_shake_finished(strength: float) -> void:
 
 ## `power` 0–1 scales how hard the dice are thrown (0.5 = normal).
 func _start_roll(power: float = 0.5) -> void:
-	# If the dice are being held (armed), throw them from the hand.
 	var from_hand: bool = _state == State.ARMED
 	_presenter.cancel()
 	_hand.release()
@@ -350,11 +415,11 @@ func _on_roll_finished(results: Array[Dictionary]) -> void:
 		_put_on_table(_current_set, _current_set_id)  # tidy up after the practice throw
 		return
 	var set_name: String = _current_set.get("name", "")
-	print("Rolled %s: %s" % [set_name, _format_results(results, false)])
+	print("Rolled %s: %s" % [set_name, RollHistory.format_dice(results, false)])
 	_history.add(RollHistory.make_entry(_current_set_id, set_name, results))
-	# Result logged — disarm until Roll is pressed again.
+	# Disarm until Roll is pressed again.
 	_set_state(State.IDLE)
-	_result_label.text = _format_results(results, true)
+	_result_label.text = RollHistory.format_dice(results, true)
 	_present_results()
 
 	if _autoroll_remaining > 0:
@@ -368,42 +433,7 @@ func _on_roll_finished(results: Array[Dictionary]) -> void:
 			get_tree().quit()
 
 
-## Results as text. Consecutive dice of the same type and label are grouped
-## ("d6: 4  2  5"), and a total is added when there's more than one die.
-## For the screen, non-breaking spaces keep "d6:" with its first value when
-## the line wraps.
-static func _format_results(results: Array[Dictionary], for_screen: bool) -> String:
-	var groups: Array[Dictionary] = []
-	var total: int = 0
-	for r: Dictionary in results:
-		var label: String = r["label"]
-		var die_name: String = r["type"] if label.is_empty() else "%s (%s)" % [label, r["type"]]
-		var value: String = str(r["value"])
-		if r["type"] == "d100":
-			value += " (%02d + %d)" % [r["parts"][0], r["parts"][1]]
-		total += r["value"]
-		if not groups.is_empty() and groups[-1]["name"] == die_name:
-			groups[-1]["values"].append(value)
-		else:
-			# A plain Array: a PackedStringArray read out of a Dictionary is a
-			# copy, so appending to it later would be lost.
-			groups.append({ "name": die_name, "values": [value] })
-
-	var nbsp: String = "\u00a0" if for_screen else " "
-	var parts: PackedStringArray = PackedStringArray()
-	for g: Dictionary in groups:
-		var values: PackedStringArray = PackedStringArray()
-		for v: String in g["values"] as Array:
-			values.append(v.replace(" ", nbsp))
-		parts.append(("%s:" % g["name"]).replace(" ", nbsp) + nbsp + "  ".join(values))
-	var text: String = ("   " if for_screen else ", ").join(parts)
-	if results.size() > 1:
-		text += ("\nTotal: %d" if for_screen else "  (total %d)") % total
-	return text
-
-
-## Lift the dice up below the result bar. Waits one frame so the bar has
-## resized to fit the new text first.
+## Lifts the dice below the result bar, one frame late so the bar has resized to the new text.
 func _present_results() -> void:
 	await get_tree().process_frame
 	if _state != State.IDLE or _roller.is_rolling():
@@ -414,7 +444,9 @@ func _present_results() -> void:
 
 func _set_state(new_state: State) -> void:
 	_state = new_state
-	# The accelerometer is ignored unless armed.
+	# Fast roll keeps the same physics steps, just more per frame, so results are unaffected.
+	Engine.time_scale = FAST_ROLL_SPEED if new_state == State.ROLLING and _settings.fast_roll else 1.0
+	_presenter.duration = 0.3 if _settings.fast_roll else 0.6
 	_shake.armed = new_state == State.ARMED
 	var has_dice: bool = not _roller.get_dice().is_empty()
 	match new_state:
@@ -437,7 +469,7 @@ func _set_state(new_state: State) -> void:
 			_roll_button.disabled = false
 			_sets_button.disabled = false
 			_history_button.disabled = false
-			_result_label.text = ARMED_HINT
+			_result_label.text = ARMED_HINT_TAP if _settings.tap_to_roll else ARMED_HINT
 		State.ROLLING:
 			_roll_button.text = "Rolling…"
 			_roll_button.disabled = true

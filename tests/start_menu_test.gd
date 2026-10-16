@@ -1,7 +1,6 @@
 extends "res://tests/app_test.gd"
-## The start menu: opens first with a silent practice throw behind it, quick
-## rolls (one-tap and custom) aren't saved as sets, Dice sets / Settings work,
-## Back returns to the menu.
+## Start menu: opens first over a silent practice throw, quick rolls aren't
+## saved as sets, and Back returns to the menu.
 
 func _init() -> void:
 	test_name = "START MENU"
@@ -58,7 +57,7 @@ func run() -> void:
 	menu.settings_pressed.emit()
 	await frames(20)
 	var settings: SettingsSheet = main.get_node("UI/Root/SettingsSheet")
-	settings.sound_changed.emit(false)
+	settings.changed.emit("sound", false)
 	await frames(3)
 	check(not (main.get_node("UI/Root/SoundToggle") as SoundToggle).button_pressed
 			and not (main.get_node("DiceSounds") as DiceSounds).enabled,

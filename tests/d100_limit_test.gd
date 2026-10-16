@@ -1,6 +1,5 @@
 extends "res://tests/app_test.gd"
-## The 20-dice limit counts a d100 as two dice: in the editor (add buttons,
-## changing a die's type) and on the table.
+## The 20-dice limit counts a d100 as two, in the editor and on the table.
 
 func _init() -> void:
 	test_name = "D100 LIMIT"

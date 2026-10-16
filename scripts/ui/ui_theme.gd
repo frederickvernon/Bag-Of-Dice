@@ -1,9 +1,8 @@
 class_name UITheme
 extends RefCounted
-## App-wide look for buttons, text fields, panels and popups, built in code
-## and applied once to the root of the UI (every control below inherits it).
+## App-wide theme, built in code and applied once at the UI root.
 ##
-## Variations (set a control's theme_type_variation to use one):
+## Variations (via theme_type_variation):
 ##   AccentButton — the main action (Roll, Save)
 ##   DangerButton — destructive actions (Delete)
 ##   CardButton   — a tappable card in a list
@@ -64,7 +63,6 @@ static func build() -> Theme:
 	return t
 
 
-## A rounded, filled box with inner padding.
 static func _box(color: Color, radius: int, pad_h: float, pad_v: float) -> StyleBoxFlat:
 	var b: StyleBoxFlat = StyleBoxFlat.new()
 	b.bg_color = color

@@ -1,32 +1,24 @@
 class_name DicePicker
 extends Node3D
-## "Pick up" step for sets with pick_dice on: lays the set's dice out on the
-## table and lets the player choose which to throw.
+## "Pick up" step for pick_dice sets: lays out the dice so the player chooses which to throw.
+## Tap toggles a die for this throw; long-press locks it (ringed, picked every throw) until long-pressed again.
 ##
-##   Tap a die        — pick it for this throw (it lifts and brightens), or
-##                      put it back (it settles and dims).
-##   Long-press a die — lock it: picked automatically for every throw, shown
-##                      with a ring, until long-pressed again.
-##
-## Works per entry of the set (a d100's two dice count as one). Dice with a
-## label show it above them so e.g. attack and defend dice are easy to tell
-## apart. Purely a selection step: it doesn't touch the physics or results.
+## Works per set entry (a d100's two dice count as one) and shows labels above labelled dice.
+## Selection only: it never touches physics or results.
 
-## The set of picked entries changed; `count` is how many are picked.
 signal selection_changed(count: int)
 
-## Seconds a press must be held to count as a long press.
+## Long-press threshold, in seconds.
 @export var long_press_time: float = 0.5
-## How close (screen pixels) a tap must land to a die's centre.
+## Max distance (screen pixels) from a die's centre that still counts as a tap on it.
 @export var tap_radius: float = 60.0
-## Taps that move further than this are drags, not taps.
+## Movement (screen pixels) beyond which a press becomes a drag, not a tap.
 @export var tap_slop: float = 24.0
-## Gap between dice centres (for full-size dice; scaled with the dice). Wide
-## enough that the biggest dice (d20, d12) don't touch.
+## Gap between full-size dice centres (scaled with the dice); wide enough that d20s and d12s don't touch.
 @export var spacing: float = 2.3
-## An even number, so a d100's two dice always share a row.
+## Keep even so a d100's two dice share a row.
 @export var max_columns: int = 4
-## How far picked dice lift off the table.
+## How far picked dice lift off the table (full-size units, scaled with the dice).
 @export var lift: float = 0.6
 
 var _roller: DiceRoller
@@ -44,8 +36,7 @@ var _long_fired: bool = false
 var _tween: Tween
 
 
-## Lay out `roller`'s dice and start picking. `locked` (entry -> true) are
-## locked from before and start picked.
+## `locked` (entry -> true) carries over earlier locks; those entries start picked.
 func begin(roller: DiceRoller, camera: Camera3D, locked: Dictionary) -> void:
 	end()
 	_roller = roller
@@ -57,7 +48,7 @@ func begin(roller: DiceRoller, camera: Camera3D, locked: Dictionary) -> void:
 	_refresh()
 
 
-## Stop picking and remove the rings and tags (dice stay where they are).
+## Removes rings and tags; the dice stay where they are.
 func end() -> void:
 	_active = false
 	_press_time = -1.0
@@ -88,7 +79,7 @@ func locked_groups() -> Dictionary:
 	return _locked.duplicate()
 
 
-## Feed input here while picking. Returns true if it was used.
+## Returns true if the event was consumed.
 func handle_input(event: InputEvent) -> bool:
 	if not _active or not (event is InputEventMouseButton or event is InputEventMouseMotion):
 		return false
@@ -133,8 +124,7 @@ func _toggle_picked(group: int) -> void:
 	_refresh()
 
 
-## Locking also picks the die; unlocking leaves it picked for this throw
-## (tap to put it back).
+## Locking also picks the die; unlocking leaves it picked for this throw.
 func _toggle_locked(group: int) -> void:
 	if _locked.has(group):
 		_locked.erase(group)
@@ -144,8 +134,7 @@ func _toggle_locked(group: int) -> void:
 	_refresh()
 
 
-## Which entry's die is under `screen_pos` (nearest centre within
-## tap_radius), or -1.
+## Entry of the nearest die within tap_radius of `screen_pos`, or -1.
 func _group_at(screen_pos: Vector2) -> int:
 	var best: int = -1
 	var best_dist: float = tap_radius
@@ -159,7 +148,7 @@ func _group_at(screen_pos: Vector2) -> int:
 	return best
 
 
-## Places every die neatly in a grid in the middle of the table, lying flat.
+## Lays every die flat in a grid in the middle of the table.
 func _layout() -> void:
 	var dice: Array[Die] = _roller.get_dice()
 	var count: int = dice.size()
@@ -189,8 +178,7 @@ func _layout() -> void:
 	_tween = null
 
 
-## Moves dice to show picked (lifted, bright) / not picked (on the table,
-## dimmed), and shows a ring under locked ones.
+## Picked dice lift and brighten, others settle and dim; locked ones get a ring.
 func _refresh() -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
@@ -207,8 +195,7 @@ func _refresh() -> void:
 			_update_ring(d, _locked.has(d.group_index))
 			var label: String = _roller.get_spec(d.group_index).get("label", "")
 			if not label.is_empty():
-				# Just beyond the die on screen (the camera looks almost
-				# straight down, so "above" would sit on top of it).
+				# Offset away on screen: the camera looks nearly straight down, so "above" would cover the die.
 				var centre: Vector3 = _group_centre(d.group_index) + (target.origin - _home[d].origin)
 				_tags[tag_index].global_position = centre + Vector3(0.0, 0.8, -1.0) * DiceFactory.SCALE
 				_tags[tag_index].modulate.a = 1.0 if picked else 0.6
@@ -236,8 +223,7 @@ func _update_ring(d: Die, show_ring: bool) -> void:
 		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(ring)
 		_rings[g] = ring
-	# One ring around the whole entry: a circle for a single die, an oval
-	# stretched around both dice of a d100.
+	# One ring per entry: a circle for one die, an oval around both dice of a d100.
 	var members: Array[Vector3] = []
 	for other: Die in _roller.get_dice():
 		if other.group_index == g:
@@ -265,7 +251,6 @@ func _group_centre(group: int) -> Vector3:
 	return sum / maxi(n, 1)
 
 
-## A floating name above a labelled die (always faces the camera).
 func _make_tag(text: String) -> Label3D:
 	var tag: Label3D = Label3D.new()
 	tag.text = text

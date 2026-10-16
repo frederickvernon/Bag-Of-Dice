@@ -1,10 +1,8 @@
 class_name HistorySheet
 extends BottomSheet
-## Bottom sheet showing past rolls, newest first. Each roll shows the set
-## name, time, one coloured chip per die (in that die's colour, with its
-## value) and the total. "Clear history" asks for confirmation first.
+## Bottom sheet of past rolls: set name, time, a coloured chip per die, total,
+## and a Copy button. "Clear history" asks for confirmation first.
 
-## The user confirmed clearing the history.
 signal clear_confirmed
 
 var _count: Label
@@ -51,7 +49,7 @@ func _build_content(column: VBoxContainer) -> void:
 	add_child(_confirm)
 
 
-## Shows the sheet listing `entries` (newest first).
+## `entries` are newest first.
 func open(entries: Array[Dictionary]) -> void:
 	refresh(entries)
 	_show_sheet()
@@ -70,7 +68,7 @@ func refresh(entries: Array[Dictionary]) -> void:
 			"" if entries.size() == 1 else "s", RollHistory.MAX_ENTRIES]
 
 
-## Is the "clear history?" confirmation showing (so Back can close it)?
+## Lets Back close the "clear history?" confirmation first.
 func is_confirming() -> bool:
 	return _confirm.visible
 
@@ -116,15 +114,29 @@ func _make_entry(e: Dictionary, now: int) -> PanelContainer:
 	for d: Dictionary in e["dice"]:
 		chips.add_child(_make_chip(d, types.size() > 1))
 
+	var bottom: HBoxContainer = HBoxContainer.new()
+	column.add_child(bottom)
 	var total: Label = Label.new()
 	total.text = "Total: %d" % e["total"]
 	total.theme_type_variation = "MutedLabel"
-	column.add_child(total)
+	total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.add_child(total)
+	var copy: Button = Button.new()
+	copy.text = "Copy"
+	copy.add_theme_font_size_override("font_size", 24)
+	copy.custom_minimum_size = Vector2(110, 56)
+	var text: String = RollHistory.format_entry(e, now)
+	copy.pressed.connect(func() -> void:
+		DisplayServer.clipboard_set(text)
+		copy.text = "Copied"
+		get_tree().create_timer(1.5).timeout.connect(func() -> void:
+			if is_instance_valid(copy):
+				copy.text = "Copy"))
+	bottom.add_child(copy)
 	return card
 
 
-## One die's result: its value on a patch of the die's colour, with the label
-## (if any) in front. d100 shows its two parts too.
+## Value on the die's colour, label in front; a d100 also shows its two parts.
 func _make_chip(d: Dictionary, show_type: bool) -> PanelContainer:
 	var color: Color = DicePalette.from_hex(d["color"])
 	var chip: PanelContainer = PanelContainer.new()

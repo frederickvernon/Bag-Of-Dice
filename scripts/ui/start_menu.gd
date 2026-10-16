@@ -1,11 +1,9 @@
 class_name StartMenu
 extends Control
-## The menu shown when the app opens (and when Back is pressed on the table):
-## continue with the current dice, a one-tap quick roll, the dice sets,
-## history and settings. The table stays loaded behind it.
+## Menu shown on launch and on Back from the table, which stays loaded behind it.
 
 signal continue_pressed
-## A quick roll of these die types, e.g. ["d6", "d6"].
+## `types` e.g. ["d6", "d6"].
 signal quick_roll(types: Array[String])
 signal custom_quick_pressed
 signal sets_pressed
@@ -24,7 +22,7 @@ var _continue_button: Button
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	# Background: the splash art, dimmed so the buttons read clearly on it.
+	# Splash art, dimmed so the buttons stay readable.
 	var art: TextureRect = TextureRect.new()
 	art.texture = load("res://assets/splash.png")
 	art.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -69,7 +67,7 @@ func _ready() -> void:
 	quick_label.text = "Quick roll"
 	quick_label.theme_type_variation = "MutedLabel"
 	column.add_child(quick_label)
-	# Four equal columns, so the buttons never squeeze into each other.
+	# Equal columns so the buttons never squeeze into each other.
 	var quick_row: GridContainer = GridContainer.new()
 	quick_row.columns = 4
 	quick_row.add_theme_constant_override("h_separation", 12)
@@ -95,8 +93,7 @@ func _ready() -> void:
 		column.add_child(b)
 
 
-## Shows "Continue: <name>", or hides the button when there's nothing to
-## continue with ("" name).
+## An empty name hides the Continue button.
 func set_continue_name(set_name: String) -> void:
 	_continue_button.visible = not set_name.is_empty()
 	_continue_button.text = "Continue: %s" % set_name

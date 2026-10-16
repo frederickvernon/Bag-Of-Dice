@@ -3,9 +3,8 @@ extends RefCounted
 ## Reading and writing app data as JSON files in user://.
 
 
-## Writes `data` as JSON. Writes to a temporary file first, then swaps it in,
-## so a crash mid-save can't leave a half-written file. Returns false on
-## failure.
+## Writes via a temp file then renames it, so a crash mid-save can't leave a
+## half-written file. Returns false on failure.
 static func write(path: String, data: Variant) -> bool:
 	var tmp_path: String = path + ".tmp"
 	var file: FileAccess = FileAccess.open(tmp_path, FileAccess.WRITE)
@@ -21,9 +20,8 @@ static func write(path: String, data: Variant) -> bool:
 	return true
 
 
-## Returns the parsed contents, or null if the file doesn't exist. A file
-## that exists but isn't valid JSON is moved aside (see keep_corrupt) and
-## null is returned.
+## Parsed contents, or null if the file is missing. Invalid JSON is moved
+## aside (see keep_corrupt) and also gives null.
 static func read(path: String) -> Variant:
 	if not FileAccess.file_exists(path):
 		return null
@@ -34,8 +32,7 @@ static func read(path: String) -> Variant:
 	return json.data
 
 
-## Moves an unreadable file to <name>.corrupt.json so it isn't overwritten
-## (and could be recovered by hand).
+## Moves an unreadable file to <name>.corrupt.json so it can be recovered by hand.
 static func keep_corrupt(path: String) -> void:
 	var backup: String = path.get_basename() + ".corrupt.json"
 	DirAccess.rename_absolute(path, backup)

@@ -1,9 +1,8 @@
 class_name RollHistory
 extends RefCounted
-## The log of past rolls, newest first, kept to a fixed 50 entries (the oldest
-## is dropped when a new roll goes over). Saved as JSON in user://.
+## Past rolls, newest first, capped at 50. Saved as JSON in user://.
 ##
-## File format (plain data so game rules could be layered on later):
+## File format:
 ## {
 ##   "version": 1,
 ##   "entries": [
@@ -15,8 +14,7 @@ extends RefCounted
 ##   ]
 ## }
 ##
-## The 50 cap is applied on every save and also when loading, so the stored
-## copy can never grow past it.
+## The cap applies on load as well as on save.
 
 const DEFAULT_PATH: String = "user://roll_history.json"
 const FORMAT_VERSION: int = 1
@@ -48,13 +46,12 @@ func load_entries() -> void:
 			entries.append(e)
 		if entries.size() >= MAX_ENTRIES:
 			break
-	# Rewrite a file that held more than the cap (or had bad entries).
+	# Rewrite a file that was over the cap or had bad entries.
 	if raw_entries.size() != entries.size():
 		save()
 
 
-## Adds a roll as the newest entry, dropping the oldest beyond the cap, and
-## saves.
+## Adds as newest, drops the oldest beyond the cap, and saves.
 func add(entry: Dictionary) -> void:
 	entries.insert(0, entry)
 	while entries.size() > MAX_ENTRIES:
@@ -87,9 +84,8 @@ static func make_entry(set_id: String, set_name: String, results: Array[Dictiona
 	return { "time": unix_time, "set_id": set_id, "set_name": set_name, "total": total, "dice": dice }
 
 
-## Returns a clean copy of an entry read from disk, or {} if it's unusable.
-## Die values outside the die's range are treated as damage and dropped; the
-## total is recalculated rather than trusted.
+## Returns a clean copy, or {} if unusable. Out-of-range die values are
+## dropped and the total is recalculated, not trusted.
 static func sanitize_entry(raw: Variant) -> Dictionary:
 	if typeof(raw) != TYPE_DICTIONARY:
 		return {}
@@ -132,8 +128,47 @@ static func sanitize_entry(raw: Variant) -> Dictionary:
 	}
 
 
-## "14:32" for today, "Yesterday 14:32", otherwise "13 Oct 14:32" — in the
-## device's local time.
+## Groups consecutive dice of the same type and label ("d6: 4  2  5").
+## On screen, non-breaking spaces keep "d6:" with its first value on wrap.
+static func format_dice(results: Array, for_screen: bool) -> String:
+	var groups: Array[Dictionary] = []
+	var total: int = 0
+	for r: Dictionary in results:
+		var label: String = r["label"]
+		var die_name: String = r["type"] if label.is_empty() else "%s (%s)" % [label, r["type"]]
+		var value: String = str(r["value"])
+		if r["type"] == "d100":
+			value += " (%02d + %d)" % [r["parts"][0], r["parts"][1]]
+		total += r["value"]
+		if not groups.is_empty() and groups[-1]["name"] == die_name:
+			groups[-1]["values"].append(value)
+		else:
+			# Plain Array: a PackedStringArray read from a Dictionary is a copy.
+			groups.append({ "name": die_name, "values": [value] })
+
+	var nbsp: String = "\u00a0" if for_screen else " "
+	var parts: PackedStringArray = PackedStringArray()
+	for g: Dictionary in groups:
+		var values: PackedStringArray = PackedStringArray()
+		for v: String in g["values"] as Array:
+			values.append(v.replace(" ", nbsp))
+		parts.append(("%s:" % g["name"]).replace(" ", nbsp) + nbsp + "  ".join(values))
+	var text: String = ("   " if for_screen else ", ").join(parts)
+	if results.size() > 1:
+		text += ("\nTotal: %d" if for_screen else "  (total %d)") % total
+	return text
+
+
+## One plain-text line for copying, e.g.
+## "Risk (14:32): Attack (d6): 6  5, Defend (d6): 4  (total 15)".
+static func format_entry(entry: Dictionary, now_unix: int = -1) -> String:
+	var title: String = str(entry.get("set_name", ""))
+	if title.is_empty():
+		title = "Roll"
+	return "%s (%s): %s" % [title, format_time(entry.get("time", 0), now_unix), format_dice(entry.get("dice", []), false)]
+
+
+## "14:32" today, "Yesterday 14:32", else "13 Oct 14:32", in local time.
 static func format_time(unix_time: int, now_unix: int = -1) -> String:
 	if now_unix < 0:
 		now_unix = int(Time.get_unix_time_from_system())

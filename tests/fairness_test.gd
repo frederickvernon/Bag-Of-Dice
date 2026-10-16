@@ -1,17 +1,15 @@
 extends Node3D
-## Headless fairness test. Throws each die type thousands of times using the
-## same DiceRoller and tables as the game, then reports how often each face
-## came up and a chi-square test against a perfectly fair die.
+## Throws each die type thousands of times with the game's DiceRoller and
+## chi-square tests the face counts against a fair die.
 ##
 ## Run from the project folder:
 ##   Godot --headless --path . res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=3000
-## Options (all optional):
+## Options:
 ##   --throws=N     throws per die type (default 3000)
-##   --arenas=N     tables per die type rolling in parallel (default 25)
-##   --types=d6,d20 which types to test (default: all)
-##   --seed=N       fixed random seed, to reproduce a run
-##   --power=P      throw power 0–1 (default: random each throw, like real
-##                  shakes of varying strength)
+##   --arenas=N     parallel tables per die type (default 25)
+##   --types=d6,d20 types to test (default: all)
+##   --seed=N       fixed seed, to reproduce a run
+##   --power=P      throw power 0–1 (default: random per throw)
 
 const ARENA_SPACING: float = 25.0
 
@@ -99,7 +97,7 @@ func _report_progress() -> void:
 		get_tree().quit(0 if _print_report() else 1)
 
 
-## Prints the report; returns true if no die looks biased.
+## Returns true if no die looks biased.
 func _print_report() -> bool:
 	print("\n===== Fairness report (%.0f s) =====" % ((Time.get_ticks_msec() - _start_ms) / 1000.0))
 	var all_ok: bool = true
@@ -112,8 +110,7 @@ func _print_report() -> bool:
 			rethrows += roller.rethrow_count
 		print("\n%s — %d throws, %d nudges, %d re-throws" % [type, s["done"], nudges, rethrows])
 		if type == "d100":
-			# 100 outcomes need far more throws to test directly, so test
-			# each of the two d10s instead (that's what decides fairness).
+			# 100 outcomes need far more throws; test each d10 instead.
 			all_ok = _print_faces("tens die", s["tens"], _values(0, 90, 10), s["done"]) and all_ok
 			all_ok = _print_faces("units die", s["units"], _values(0, 9, 1), s["done"]) and all_ok
 		else:
@@ -124,8 +121,7 @@ func _print_report() -> bool:
 	return all_ok
 
 
-## Prints the frequency table and chi-square test for one die. Returns false
-## if the result is suspicious (p < 0.01).
+## Returns false if suspicious (p < 0.01).
 func _print_faces(title: String, counts: Dictionary, faces: Array[int], n: int) -> bool:
 	var expected: float = float(n) / faces.size()
 	var chi: float = 0.0
@@ -154,8 +150,7 @@ static func _values(from: int, to: int, step: int) -> Array[int]:
 	return v
 
 
-## Upper-tail p-value of the chi-square distribution, using the
-## Wilson–Hilferty normal approximation (accurate enough for df >= 3).
+## Upper-tail p-value via Wilson–Hilferty (accurate enough for df >= 3).
 static func _chi_square_p(chi: float, df: int) -> float:
 	var k: float = float(df)
 	var z: float = (pow(chi / k, 1.0 / 3.0) - (1.0 - 2.0 / (9.0 * k))) / sqrt(2.0 / (9.0 * k))

@@ -1,14 +1,11 @@
 class_name DiceRoller
 extends Node3D
-## Owns the dice on one table: throws them, waits until every die has
-## settled, fixes cocked dice, then reports the results.
-##
-## Place this node at the table's centre (the table surface is at local y = 0).
+## Throws the dice on one table, waits for all to settle, fixes cocked dice and reports results.
+## Place at the table's centre; the table surface is at local y = 0.
 
-## Emitted once every die is at rest with a clear top face. Each result is
-## plain data: { "type": "d6", "value": 4, "color": "#f2edd9", "label": "",
-## "parts": [4] }.
-## For a d100, "parts" is [tens, units] and "value" is 1–100.
+## Emitted once every die rests with a clear top face. Each result looks like
+## { "type": "d6", "value": 4, "color": "#f2edd9", "label": "", "parts": [4] };
+## a d100 has parts [tens, units] and value 1–100.
 signal roll_finished(results: Array[Dictionary])
 ## A die hit something, for sound effects. `kind`: "felt" (the table top),
 ## "wood" (the rim), "click" (another die) or "cup" (the hand holding them).
@@ -18,27 +15,22 @@ signal die_impact(kind: String, speed: float)
 @export var table_size: Vector2 = Vector2(9.0, 15.0)
 @export var throw_speed_min: float = 10.0
 @export var throw_speed_max: float = 17.0
-## How much throw power (0–1, e.g. from shake strength) scales the speed:
-## power 0 multiplies it by x, power 1 by y. Power only changes how hard the
-## dice are thrown; their starting orientation and spin stay fully random, so
-## it can't favour any face.
+## Speed multiplier at throw power 0 (x) and 1 (y); power is 0–1, e.g. shake strength.
+## Power never affects orientation or spin, so it can't favour a face.
 @export var power_speed_scale: Vector2 = Vector2(0.8, 1.25)
 @export var spin_min: float = 15.0
 @export var spin_max: float = 30.0
-## Upward speed range at launch, so dice arc through the air and land at an
-## angle (which makes them tumble) instead of skimming flat.
+## Upward launch speed range, so dice arc and land at an angle (and tumble) instead of skimming flat.
 @export var throw_lift: Vector2 = Vector2(3.0, 6.0)
-## Extra forward-tumbling spin (rad/s) around the axis that makes a die roll
-## in the direction it's thrown, like a die flicked off the fingers.
+## Extra forward-tumbling spin (rad/s) in the throw direction, like a die flicked off the fingers.
 @export var forward_spin: Vector2 = Vector2(12.0, 22.0)
 ## A resting die whose lowest corner is more than this above the table is
 ## lying on another die, not on the table, and is re-thrown.
 @export var on_table_tolerance: float = 0.15
 ## Times to nudge a cocked die before re-throwing it.
 @export var max_nudges: int = 3
-## Safety net: re-throw a die that has kept moving for this many seconds
-## without a break. Timed per die, from its own last throw / nudge, so a die
-## that was just re-thrown always gets the full time to land.
+## Re-throw a die still moving after this many seconds.
+## Timed per die from its own last throw or nudge, so a re-thrown die gets the full time.
 @export var roll_timeout: float = 10.0
 ## Print nudges / re-throws to the Output panel.
 @export var log_events: bool = true
@@ -49,8 +41,7 @@ var rethrow_count: int = 0
 
 var _specs: Array[Dictionary] = []
 var _dice: Array[Die] = []
-## Dice taking part in the next throw (all, unless some were set aside with
-## set_active_groups). The rest sit out, frozen in a row at the near edge.
+## Dice in the next throw; the rest sit out, frozen in a row at the near edge.
 var _active: Array[Die] = []
 var _rolling: bool = false
 ## Set by roll(); the dice are actually launched at the next physics step.
@@ -63,8 +54,7 @@ var _from_current: bool = false
 ## "color": Color, "label": "Attacker" } (all but "type" optional).
 func set_dice(specs: Array[Dictionary]) -> void:
 	for d: Die in _dice:
-		# Remove now (not just at the end of the frame) so the new dice can
-		# reuse the names.
+		# Remove now, not at end of frame, so the new dice can reuse the names.
 		remove_child(d)
 		d.queue_free()
 	_dice.clear()
@@ -77,8 +67,7 @@ func set_dice(specs: Array[Dictionary]) -> void:
 		var color: Color = _specs[i].get("color", DiceFactory.DEFAULT_COLOR)
 		for die: Die in DiceFactory.create(_specs[i]["type"], color, _specs[i].get("style", "")):
 			die.group_index = i
-			# Number by position in the set, e.g. "D20-6", so log messages say
-			# which die they mean even when a set has several of one type.
+			# Suffix the set position (e.g. "D20-6") so logs can tell same-type dice apart.
 			die.name = "%s-%d" % [die.name, i + 1]
 			die.impact.connect(_on_die_impact)
 			add_child(die)
@@ -105,10 +94,8 @@ func get_active_dice() -> Array[Die]:
 	return _active
 
 
-## Chooses which entries of the set (by index in the specs given to
-## set_dice; a d100's two dice share one) take part in the next throws. The
-## others are frozen, dimmed and set aside in a row along the near edge of
-## the table.
+## Picks which set entries (indices into set_dice's specs; a d100's two dice share one) take part.
+## The rest are frozen, dimmed and set aside along the near edge.
 func set_active_groups(groups: Array[int]) -> void:
 	_active.clear()
 	var aside: Array[Die] = []
@@ -134,7 +121,6 @@ func set_active_groups(groups: Array[int]) -> void:
 		d.set_dimmed(true)
 
 
-## Every entry of the set takes part (the normal case).
 func activate_all() -> void:
 	var all: Array[int] = []
 	for i: int in _specs.size():
@@ -142,9 +128,8 @@ func activate_all() -> void:
 	set_active_groups(all)
 
 
-## World positions to hold the dice at before a throw: a loose cluster
-## raised above the near half of the table, not overlapping. Throwing with
-## from_current_positions launches them from wherever they are, e.g. these.
+## Where to hold the dice before a throw: a loose, non-overlapping cluster above the near half.
+## roll() with from_current_positions launches them from there.
 func hand_positions() -> Array[Vector3]:
 	var count: int = _active.size()
 	var spacing: float = 1.35
@@ -168,10 +153,8 @@ func is_rolling() -> bool:
 	return _rolling
 
 
-## Starts a roll. The throw itself happens at the next physics step, so dice
-## are never teleported in the middle of other work (such as being lifted to
-## the screen). With from_current_positions the dice launch from where they
-## are now (they must be inside the table, e.g. at hand_positions()).
+## The throw is deferred to the next physics step so dice never teleport mid-work (e.g. while being lifted).
+## With from_current_positions dice launch from where they are, which must be inside the table.
 func roll(power: float = 0.5, from_current_positions: bool = false) -> void:
 	if _active.is_empty():
 		return
@@ -196,8 +179,7 @@ func _physics_process(delta: float) -> void:
 			_throw_die(_active[i], starts[i])
 		return
 
-	# Safety net: a die should never get past the walls, but if one does,
-	# throw it again rather than waiting for it to fall forever.
+	# Safety net: re-throw a die that escapes the walls instead of letting it fall forever.
 	for d: Die in _active:
 		if _is_off_table(d):
 			_log("%s left the table — re-throwing it" % d.name)
@@ -215,13 +197,11 @@ func _physics_process(delta: float) -> void:
 				_rethrow(d)
 		return
 
-	# Everything has stopped. Every die must be lying on the table with a clear
-	# top face; fix any that aren't, then wait for things to settle again.
+	# All stopped. Fix any die not flat on the table with a clear top face, then wait again.
 	var any_cocked: bool = false
 	for d: Die in _active:
 		if not _is_on_table(d):
-			# Resting on other dice. Re-throw rather than nudge, since a nudge
-			# would just as likely disturb the dice underneath.
+			# On other dice: re-throw, since a nudge could disturb the dice underneath.
 			any_cocked = true
 			_log("%s landed on top of another die — re-throwing it" % d.name)
 			_rethrow(d)
@@ -244,8 +224,7 @@ func _physics_process(delta: float) -> void:
 	roll_finished.emit(_collect_results())
 
 
-## Works out what a die hit, for the sound: another die, the wooden rim (a
-## mostly sideways hit near a wall) or the felt.
+## Classifies a hit for sound: the wooden rim is a mostly sideways hit near a wall, otherwise felt.
 func _on_die_impact(d: Die, other: Node, speed: float) -> void:
 	if other is Die:
 		die_impact.emit("click", speed)
@@ -301,8 +280,7 @@ func _rethrow(d: Die) -> void:
 	_throw_die(d, _start_positions(1)[0])
 
 
-## Launch from `local_start` toward a random point around the middle of the
-## table, with a uniformly random orientation and random spin.
+## Aims at a random point near the middle with uniformly random orientation and spin.
 func _throw_die(d: Die, local_start: Vector3) -> void:
 	var half: Vector2 = table_size * 0.5
 	var target: Vector3 = Vector3(
@@ -318,7 +296,7 @@ func _throw_die(d: Die, local_start: Vector3) -> void:
 	var ang_vel: Vector3 = _random_unit_vector() * randf_range(spin_min, spin_max) \
 			+ roll_axis * randf_range(forward_spin.x, forward_spin.y)
 	if _from_current and not d.freeze:
-		# Thrown out of the cup: keep some of the motion it had from shaking.
+		# Thrown from the cup: keep some of the shaking motion.
 		lin_vel += d.linear_velocity.limit_length(8.0) * 0.5
 	d.throw(to_global(local_start), global_basis * Basis(_random_rotation()),
 			global_basis * lin_vel, global_basis * ang_vel)

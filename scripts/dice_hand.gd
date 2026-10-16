@@ -1,37 +1,30 @@
 class_name DiceHand
 extends Node3D
-## While a roll is armed, holds the dice in a "cup": an invisible box above
-## the near half of the table. Inside it the dice are real physics bodies, so
-## shaking the phone kicks them about — they tumble, knock into each other
-## and the cup, and end up in a different jumble every time (the rattle you
-## hear is those real collisions). When the throw comes, the cup vanishes and
-## the dice launch from wherever they are.
+## While armed, holds the dice as real physics bodies in an invisible cup above the near half of the table.
+## Shaking kicks them around (the rattle is real collisions); on the throw the cup vanishes and they launch from there.
 ##
-## Fairness: this only affects where the dice start from and how they're
-## moving. The throw still gives every die a fresh, uniformly random
-## orientation (see DiceRoller), so the cup can't favour any face.
+## Fairness: the cup only sets start position and motion; the throw still gives each die a uniformly random orientation.
 
+## Seconds.
 @export var gather_time: float = 0.35
-## Inside size of the cup (x and z grow with the number of dice).
+## Inside height of the cup; x and z fit the dice plus cup_margin on each side.
 @export var cup_height: float = 3.5
 @export var cup_margin: float = 0.9
-## Speed (units/s) of the kicks given to the dice at the hardest shake, and
-## how often each die is kicked per second.
+## Kick speed (units/s) at the hardest shake, and kicks per die per second.
 @export var shake_kick: float = 7.0
 @export var shake_kicks_per_second: float = 14.0
-## Top speed of a die inside the cup, so repeated kicks can't build up into
-## something fast enough to punch through the walls.
+## Speed cap (units/s) in the cup, so repeated kicks can't punch a die through the walls.
 @export var max_speed_in_cup: float = 9.0
 ## Small occasional nudges while held still, so the dice don't look frozen.
 @export var idle_kick: float = 0.8
 @export var idle_kicks_per_second: float = 0.6
 
-## 0–1: how hard the phone is being shaken right now. Set every frame.
+## 0–1, set every frame from the shake detector.
 var shake_level: float = 0.0
 
 var _dice: Array[Die] = []
 var _cup: StaticBody3D
-## Inside of the cup (world space), for putting back any die that escapes.
+## Cup interior (world space), for putting back any die that escapes.
 var _inside: AABB
 var _tween: Tween
 var _holding: bool = false
@@ -49,9 +42,7 @@ func _ready() -> void:
 	_set_cup_enabled(false)
 
 
-## Lift `dice` (from the table, or wherever they're being shown) into the cup.
-## `homes`: a starting spot per die (world positions); the cup is built
-## around them.
+## `homes`: one world start position per die; the cup is built around them.
 func gather(dice: Array[Die], homes: Array[Vector3]) -> void:
 	release()
 	if dice.is_empty():
@@ -66,7 +57,6 @@ func gather(dice: Array[Die], homes: Array[Vector3]) -> void:
 		var die: Die = _dice[i]
 		die.freeze = true
 		var from: Transform3D = die.global_transform
-		# Tumble into the hand in a random orientation.
 		var to: Transform3D = Transform3D(Basis(_random_rotation()), homes[i])
 		_tween.tween_method(
 				func(t: float) -> void: die.global_transform = from.interpolate_with(to, t),
@@ -74,8 +64,7 @@ func gather(dice: Array[Die], homes: Array[Vector3]) -> void:
 	_tween.chain().tween_callback(_drop_into_cup)
 
 
-## Stop holding: the cup disappears and the dice are left as they are (the
-## roller then throws them, or the set is reset).
+## Removes the cup and leaves the dice where they are, for the roller to throw or the set to reset.
 func release() -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
@@ -107,21 +96,18 @@ func _physics_process(delta: float) -> void:
 		if not is_instance_valid(die):
 			continue
 		_contain(die)
-		# A die that's barely moving during a shake is probably pinned under
-		# others: kick it more often so every die gets mixed in.
+		# A near-still die during a shake is probably pinned; kick it more often so it mixes in.
 		var die_rate: float = rate * (3.0 if shake_level >= 0.05 and die.linear_velocity.length() < 1.0 else 1.0)
 		if randf() > die_rate * delta:
 			continue
-		# Mostly upward, so dice hop off the cup floor and tumble into each
-		# other, with a random sideways part to mix them around.
+		# Mostly upward so dice hop and tumble, plus a random sideways part to mix them.
 		var dir: Vector3 = (_random_unit_vector() + Vector3.UP * 0.8).normalized()
 		die.sleeping = false
 		die.apply_central_impulse(dir * kick_speed * die.mass * randf_range(0.6, 1.0))
 		die.apply_torque_impulse(_random_unit_vector() * kick_speed * 0.08 * die.mass)
 
 
-## Keeps a die inside the cup: limits its speed, and if it has got out
-## anyway, puts it back in the middle.
+## Caps a die's speed and puts it back in the middle if it escapes anyway.
 func _contain(die: Die) -> void:
 	if die.linear_velocity.length() > max_speed_in_cup:
 		die.linear_velocity = die.linear_velocity.limit_length(max_speed_in_cup)
@@ -130,8 +116,7 @@ func _contain(die: Die) -> void:
 		die.linear_velocity = Vector3.ZERO
 
 
-## A box (floor, four walls and a lid) around `homes` with some room to move.
-## Walls are thick and overlap at the corners, so there are no gaps.
+## Closed box (floor, walls, lid) around `homes`. Walls are thick and overlap at the corners, so there are no gaps.
 func _build_cup(homes: Array[Vector3]) -> void:
 	for child: Node in _cup.get_children():
 		_cup.remove_child(child)

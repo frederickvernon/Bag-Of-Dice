@@ -1,36 +1,28 @@
 class_name ShakeDetector
 extends Node
-## Watches the phone's accelerometer for a deliberate shake and reports it when
-## the shaking stops. Only listens while `armed` is true.
-##
-## The accelerometer always includes gravity (about 9.8 m/s² pointing down),
-## which must be subtracted to leave the phone's own movement. Most phones
-## have a "gravity" sensor that reports it directly; if not, a slowly-updated
-## average of the readings is used as the estimate instead.
+## Reports a deliberate accelerometer shake once it stops; only listens while `armed`.
+## Gravity is removed using the phone's gravity sensor, or a slow running average if it has none.
 
-## Shaking has begun (for UI feedback).
+## For UI feedback.
 signal shake_started
-## Shaking has stopped. `strength` is 0–1, from the hardest jolt in the shake.
+## `strength` is 0–1, from the hardest jolt in the shake.
 signal shake_finished(strength: float)
 
 ## Movement (m/s², gravity removed) that counts as shaking.
 @export var threshold: float = 12.0
-## Movement treated as the hardest possible shake (strength 1.0).
+## Movement (m/s²) treated as the hardest possible shake (strength 1.0).
 @export var max_movement: float = 40.0
-## It counts as a shake after this many separate jolts above the threshold...
+## A shake needs this many separate jolts above the threshold...
 @export var min_jolts: int = 2
-## ...or after this long above it in total (a vigorous circular shake can
-## stay above the threshold the whole time). A single bump of the phone
-## meets neither, so it doesn't throw.
+## ...or this many seconds above it in total, for circular shakes that never dip.
+## A single bump meets neither, so it doesn't throw.
 @export var min_shake_time: float = 0.35
-## How long movement must stay below the threshold for the shake to be over.
+## Seconds below the threshold before the shake counts as over.
 @export var stop_delay: float = 0.25
-## How quickly the gravity estimate follows the readings, in seconds. Longer
-## is steadier during a shake but slower to adapt when the phone is tilted.
+## Gravity estimate time constant (seconds): longer is steadier mid-shake, slower to follow a tilt.
 @export var gravity_time_constant: float = 0.6
 
-## 0–1: how hard the phone is moving right now (0 when not armed). Rises
-## instantly and fades over about half a second; for visual feedback only.
+## 0–1, 0 when disarmed. Rises instantly, fades over about 0.5 s; visual feedback only.
 var level: float = 0.0
 
 var armed: bool = false:
@@ -53,15 +45,13 @@ func _process(delta: float) -> void:
 	process_reading(Input.get_accelerometer() + _debug_shake(delta), delta, Input.get_gravity())
 
 
-## Handles one accelerometer reading (m/s²), plus the gravity sensor's reading
-## if the phone has one (zero if not). Called every frame; public so tests can
-## feed in simulated readings.
+## One accelerometer reading (m/s²) plus the gravity sensor's (zero if none).
+## Public so tests can feed simulated readings.
 func process_reading(reading: Vector3, delta: float, sensor_gravity: Vector3 = Vector3.ZERO) -> void:
 	if sensor_gravity != Vector3.ZERO:
 		_gravity = sensor_gravity
 	else:
-		# Keep the estimate up to date even while disarmed, so it's already
-		# settled by the time the player arms a roll.
+		# Track even while disarmed so the estimate has settled before arming.
 		if not _has_gravity:
 			_gravity = reading
 			_has_gravity = true
@@ -115,8 +105,7 @@ func _reset() -> void:
 	_quiet_time = 0.0
 
 
-## Desktop testing aid (debug builds on computers only): hold S to fake a
-## shake, since a Mac has no accelerometer.
+## Debug desktop builds only: hold S to fake a shake, since a Mac has no accelerometer.
 func _debug_shake(delta: float) -> Vector3:
 	if not OS.is_debug_build() or OS.has_feature("mobile"):
 		return Vector3.ZERO

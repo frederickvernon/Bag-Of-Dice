@@ -1,14 +1,12 @@
 extends SceneTree
-## Tests for DiceSetStore (saving / loading dice sets). Uses its own file in
-## user://, never the app's real one, and deletes it afterwards.
+## DiceSetStore save/load. Uses its own throwaway file, never the real one.
 ##
 ## Run from the project folder:
 ##   Godot --headless --path . -s res://tests/store_test.gd
 
 const PATH: String = "user://test_dice_sets.json"
 
-## Number of checks below. If fewer run (e.g. a script failed to compile and
-## a test stopped early), the run counts as failed.
+## If fewer checks run (e.g. a test stopped early), the run fails.
 const EXPECTED_CHECKS: int = 29
 
 var _failures: int = 0

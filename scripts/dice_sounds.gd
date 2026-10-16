@@ -1,9 +1,7 @@
 class_name DiceSounds
 extends Node
-## Dice sound effects, generated in code (no audio files): a soft thud for
-## the felt, a wooden knock for the rim, and a sharp click when dice hit each
-## other or rattle in the hand. Louder for harder hits; slightly different
-## pitch every time so repeated hits don't sound mechanical.
+## Dice sounds synthesised in code (no audio files): felt thud, rim knock, die-on-die click.
+## Pitch varies slightly each time so repeated hits don't sound mechanical.
 
 @export var enabled: bool = true
 ## Overall volume (dB).
@@ -12,8 +10,7 @@ extends Node
 @export var min_impact_speed: float = 1.0
 ## Impact speed that plays at full volume.
 @export var max_impact_speed: float = 14.0
-## Most sounds started within one burst window, so 20 dice landing at once
-## don't turn into noise.
+## Cap on sounds per burst window (s), so many dice landing at once don't turn into noise.
 @export var max_sounds_per_burst: int = 5
 @export var burst_window: float = 0.05
 
@@ -42,8 +39,7 @@ func _process(delta: float) -> void:
 	_time += delta
 
 
-## Stop anything still playing, so quitting mid-sound doesn't leave the
-## audio engine holding on to it.
+## Stops and releases streams so quitting mid-sound doesn't leave the audio engine holding them.
 func _exit_tree() -> void:
 	stop_all()
 	for p: AudioStreamPlayer in _players:
@@ -85,9 +81,7 @@ func play(kind: String, strength: float) -> void:
 	p.play()
 
 
-# --- Sound synthesis ----------------------------------------------------------
-# Each sound is a short burst built sample by sample: some noise plus a few
-# tones, fading out quickly.
+# Sound synthesis: each sound is noise plus a few tones with a fast decay.
 
 static func _make_sound(seconds: float, sample_at: Callable) -> AudioStreamWAV:
 	var count: int = int(seconds * MIX_RATE)

@@ -1,8 +1,7 @@
 class_name SoundToggle
 extends Button
-## Small round button showing a speaker: with sound waves when sound is on,
-## with a cross when it's off. The icon is drawn in code (no image files).
-## Use `button_pressed` for on/off; `toggled` fires when tapped.
+## Round speaker button, drawn in code: waves when on, a cross when off.
+## Use `button_pressed` for on/off.
 
 
 func _ready() -> void:
@@ -31,11 +30,9 @@ func _draw() -> void:
 	]), ink)
 	var wx: float = left + 24 * u
 	if button_pressed:
-		# Two sound waves.
 		draw_arc(Vector2(wx, c.y), 7 * u, -PI / 3.5, PI / 3.5, 16, ink, 3.5 * u, true)
 		draw_arc(Vector2(wx, c.y), 15 * u, -PI / 3.5, PI / 3.5, 16, ink, 3.5 * u, true)
 	else:
-		# A cross: muted.
 		var x0: float = wx + 3 * u
 		draw_line(Vector2(x0, c.y - 9 * u), Vector2(x0 + 16 * u, c.y + 9 * u), ink, 3.5 * u, true)
 		draw_line(Vector2(x0, c.y + 9 * u), Vector2(x0 + 16 * u, c.y - 9 * u), ink, 3.5 * u, true)

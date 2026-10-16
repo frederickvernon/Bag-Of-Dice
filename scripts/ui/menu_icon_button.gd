@@ -1,7 +1,6 @@
 class_name MenuIconButton
 extends Button
-## Small round button with a "≡" icon (drawn in code), for going back to the
-## start menu from the table.
+## Round "≡" button (drawn in code) that goes back to the start menu.
 
 
 func _ready() -> void:

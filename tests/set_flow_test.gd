@@ -1,6 +1,6 @@
 extends "res://tests/app_test.gd"
-## Dice sets end to end: create a set in the editor, roll it, edit it, delete
-## it, check the saved file; then roll a full 20-die set.
+## Dice sets end to end: create, roll, edit, delete, check the saved file;
+## then roll a full 20-die set.
 
 var _main: Node
 var _store: DiceSetStore
@@ -60,7 +60,7 @@ func run() -> void:
 	snap("20d6")
 
 
-## Roll button twice (arm, then throw) and wait for the result.
+## Presses Roll twice (arm, then throw).
 func _roll() -> Array:
 	_main.call("_on_roll_button_pressed")
 	_main.call("_on_roll_button_pressed")

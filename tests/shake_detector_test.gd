@@ -1,7 +1,6 @@
 extends "res://tests/app_test.gd"
-## The shake detector on simulated accelerometer readings, with and without
-## a gravity sensor: real shakes throw; a single bump, tilting or flipping
-## the phone, and shaking while not armed don't.
+## Shake detector with simulated readings, with and without a gravity sensor:
+## real shakes throw; a bump, tilt, flip, or shake while not armed doesn't.
 
 const DT: float = 1.0 / 60.0
 const G: Vector3 = Vector3(0, -9.8, 0)

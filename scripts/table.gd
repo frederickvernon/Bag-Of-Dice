@@ -1,9 +1,8 @@
 class_name Table
 extends StaticBody3D
-## Flat table with invisible walls and ceiling, built in code.
-## The playing surface is the rectangle size.x by size.y, centred on the
-## origin, with its top at y = 0. A low wooden rim is drawn along the walls;
-## the collision walls themselves are much taller but invisible.
+## Flat table with invisible walls and ceiling, built in code. The play area is
+## size.x by size.y, centred on the origin, top at y = 0. The visible rim is low;
+## the collision walls are much taller.
 
 ## Keep in step with DiceRoller.table_size.
 @export var size: Vector2 = Vector2(9.0, 15.0)
@@ -17,8 +16,7 @@ extends StaticBody3D
 
 func _ready() -> void:
 	var phys: PhysicsMaterial = PhysicsMaterial.new()
-	# Felt is grippy: high friction makes dice catch and tumble rather than
-	# skate across the surface.
+	# High friction so dice catch and tumble rather than skate across the felt.
 	phys.friction = 1.0
 	phys.bounce = 0.1
 	physics_material_override = phys
@@ -39,8 +37,7 @@ func _ready() -> void:
 	# Visible felt, slightly larger than the play area so it runs under the rim.
 	_add_mesh(Vector3(size.x + 2.0 * rim_width, 0.2, size.y + 2.0 * rim_width),
 			Vector3(0.0, -0.1, 0.0), _felt_material())
-	# Wooden rim, drawn inside the space of the invisible walls. The grain
-	# runs along each piece's length.
+	# Wooden rim inside the invisible walls, grain running along each piece.
 	var rw: float = rim_width
 	var rh: float = rim_height
 	var outer_x: float = size.x + 2.0 * rw
@@ -106,8 +103,7 @@ func _wood_material(grain_scale: Vector3) -> StandardMaterial3D:
 
 	var mat: StandardMaterial3D = StandardMaterial3D.new()
 	mat.albedo_texture = tex
-	# Project the texture from all three sides, so it isn't stretched oddly
-	# across the box faces.
+	# Triplanar so the grain isn't stretched across the box faces.
 	mat.uv1_triplanar = true
 	mat.uv1_scale = grain_scale
 	mat.roughness = 0.55

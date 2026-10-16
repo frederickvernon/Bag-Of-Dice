@@ -1,7 +1,6 @@
 extends "res://tests/app_test.gd"
-## Shaking dice in the hand (Fireball, 8d6), with simulated accelerometer
-## readings: every die moves around while shaking, none escapes the cup,
-## and stopping the shake throws them onto the table. Repeated 5 times.
+## Simulated shaking of 8d6 in the hand, 5 times: every die moves, none escapes
+## the cup, and stopping the shake throws them.
 
 var _main: Node
 var _roller: DiceRoller

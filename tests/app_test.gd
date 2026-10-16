@@ -1,20 +1,18 @@
 extends SceneTree
-## Shared base for the tests in this folder. A test extends this file, sets
-## `test_name`, and puts its steps in run() (which may use await). Each check
-## prints PASS or FAIL; the run exits with code 0 only if every check passed.
+## Base for the tests here: set `test_name` and put the steps in run().
+## Exits 0 only if every check passed.
 ##
-## Tests that launch the app (uses_app = true) must be given throwaway data
-## files, so they never touch the real sets, history or settings:
+## Tests that launch the app must use throwaway data files (run_all.sh passes
+## them; they're deleted before and after each test):
 ##   -- --sets-file=user://test_sets.json --history-file=user://test_history.json
 ##      --settings-file=user://test_settings.json
-## run_all.sh passes these. The files are deleted before and after each test.
 
 const FILE_ARGS: Array[String] = ["--sets-file=", "--history-file=", "--settings-file="]
 
 var test_name: String = "TEST"
-## Whether the test launches the app (and so needs throwaway data files).
+## If true, the test needs throwaway data files.
 var uses_app: bool = true
-## Give up and fail after this many seconds.
+## Seconds before the test gives up and fails.
 var time_limit: float = 240.0
 
 var _checks: int = 0
@@ -39,7 +37,6 @@ func _start() -> void:
 	finish()
 
 
-## Override with the test's steps.
 func run() -> void:
 	pass
 
@@ -65,7 +62,7 @@ func finish() -> void:
 	quit(0 if _failures == 0 else 1)
 
 
-## Starts the app's main screen (it opens on the start menu).
+## Opens on the start menu.
 func launch_main() -> Node:
 	var main: Node = (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(main)
@@ -82,8 +79,7 @@ func physics_frames(n: int) -> void:
 		await physics_frame
 
 
-## Saves a screenshot if the SHOT environment variable gives a path prefix
-## (only works with a window, not --headless).
+## Saves a screenshot when SHOT is set to a path prefix. Not under --headless.
 func snap(shot_name: String) -> void:
 	var prefix: String = OS.get_environment("SHOT")
 	if not prefix.is_empty() and DisplayServer.get_name() != "headless":

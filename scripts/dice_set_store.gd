@@ -1,32 +1,26 @@
 class_name DiceSetStore
 extends RefCounted
-## Loads and saves the user's dice sets as JSON in user:// (the app's private
-## storage — on Android it's inside the app's data folder; on a Mac it's under
-## ~/Library/Application Support/Godot/app_userdata/Bag Of Dice/).
+## Loads and saves the user's dice sets as JSON in user://.
+## On a Mac that's ~/Library/Application Support/Godot/app_userdata/Bag Of Dice/.
 ##
-## File format (plain data so it can be read, or extended, later):
+## File format:
 ## {
 ##   "version": 1,
 ##   "last_set_id": "…",
 ##   "sets": [
 ##     { "id": "…", "name": "Fireball", "pick_dice": false,
 ##       "dice": [ { "type": "d6", "style": "pips", "color": "#e8742a", "label": "" }, … ] }
-##
-## style: how the faces look, for types with a choice (see DiceFactory.STYLES);
-## missing or unknown means the natural default (pips on a d6, 0–9 on a d10).
-## pick_dice: before each throw the player picks which of the set's dice to
-## throw (e.g. one Risk set holding both attack and defend dice).
 ##   ]
 ## }
+## style: face look (see DiceFactory.STYLES); missing or unknown means the default.
+## pick_dice: the player picks which of the set's dice to throw each time.
 ##
-## Everything read from disk is checked; anything malformed is dropped rather
-## than crashing the app. A file that can't be read at all is kept aside as
-## dice_sets.corrupt.json instead of being overwritten (see JsonFile).
+## Malformed data from disk is dropped, not fatal. An unreadable file is kept
+## aside as dice_sets.corrupt.json, not overwritten (see JsonFile).
 
 const DEFAULT_PATH: String = "user://dice_sets.json"
 const FORMAT_VERSION: int = 1
-## Most physical dice a set can put on the table. A d100 counts as 2, since
-## it's rolled as two d10s.
+## Max physical dice per set. A d100 counts as 2 (rolled as two d10s).
 const MAX_DICE: int = 20
 const MAX_NAME_LENGTH: int = 40
 const MAX_LABEL_LENGTH: int = 24
@@ -40,7 +34,7 @@ func _init(file_path: String = DEFAULT_PATH) -> void:
 	path = file_path
 
 
-## Reads the file. On first run (no file yet) starts with the example sets.
+## On first run (no file yet) starts with the example sets.
 func load_sets() -> void:
 	sets.clear()
 	last_set_id = ""
@@ -62,7 +56,7 @@ func load_sets() -> void:
 	last_set_id = str(data.get("last_set_id", ""))
 
 
-## Writes all sets. Returns false on failure.
+## Returns false on failure.
 func save_sets() -> bool:
 	return JsonFile.write(path, { "version": FORMAT_VERSION, "last_set_id": last_set_id, "sets": sets })
 
@@ -74,8 +68,7 @@ func get_set(id: String) -> Dictionary:
 	return {}
 
 
-## Adds a new set or replaces the one with the same id, then saves. Returns
-## the cleaned-up set as stored ({} if it was invalid, e.g. no dice).
+## Adds or replaces by id, then saves. Returns the cleaned set, or {} if invalid.
 func upsert(set_data: Dictionary) -> Dictionary:
 	var s: Dictionary = sanitize_set(set_data)
 	if s.is_empty():
@@ -106,9 +99,8 @@ func set_last_used(id: String) -> void:
 		save_sets()
 
 
-## Returns a clean copy of a set, or {} if it can't be used (not a
-## dictionary, or no valid dice). Fixes what it can: trims and shortens the
-## name, drops unknown die types, replaces bad colours, caps the dice count.
+## Returns a clean copy, or {} if there are no valid dice. Fixes what it can:
+## trims the name, drops unknown types, replaces bad colours, caps the count.
 static func sanitize_set(raw: Variant) -> Dictionary:
 	if typeof(raw) != TYPE_DICTIONARY:
 		return {}
@@ -130,7 +122,7 @@ static func sanitize_set(raw: Variant) -> Dictionary:
 			if not DiceFactory.TYPES.has(type):
 				continue
 			if physical + DiceFactory.dice_count(type) > MAX_DICE:
-				continue  # no room left for this one
+				continue
 			physical += DiceFactory.dice_count(type)
 			var color: String = str(d.get("color", ""))
 			if not DicePalette.is_valid_hex(color):
@@ -162,7 +154,7 @@ static func to_roller_specs(set_data: Dictionary) -> Array[Dictionary]:
 	return specs
 
 
-## How many physical dice the set puts on the table (d100 counts as 2).
+## Physical dice on the table (d100 counts as 2).
 static func physical_count(set_data: Dictionary) -> int:
 	var n: int = 0
 	for d: Dictionary in set_data.get("dice", []):
@@ -170,7 +162,7 @@ static func physical_count(set_data: Dictionary) -> int:
 	return n
 
 
-## Short description such as "8d6" or "1d4 + 1d6 + 1d20", in die-type order.
+## E.g. "8d6" or "1d4 + 1d6 + 1d20", in die-type order.
 static func summary(set_data: Dictionary) -> String:
 	var counts: Dictionary = {}
 	for d: Dictionary in set_data.get("dice", []):
@@ -185,7 +177,6 @@ static func summary(set_data: Dictionary) -> String:
 static func example_sets() -> Array[Dictionary]:
 	var examples: Array[Dictionary] = []
 	examples.append(_example("Fireball", _repeat("d6", "#e8742a", 8), false))
-	# Attack and defend dice in one set; pick which ones each throw.
 	examples.append(_example("Risk",
 			_repeat("d6", "#d23333", 3, "Attack") + _repeat("d6", "#f2edd9", 2, "Defend"), true))
 	var rpg: Array[Dictionary] = []
