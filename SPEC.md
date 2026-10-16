@@ -134,7 +134,7 @@ Files in the app's private folder (`user://`):
 | Feature | Spec | Status |
 |---|---|---|
 | Effects | Generated in code (no audio files or licences): soft thud on felt, wooden knock on the rim, sharp click between dice, softer click against the hand while shaking. Harder hits louder; slight pitch variation; max `5` sounds per `50 ms` so big rolls don't become noise | VERIFY ON DEVICE |
-| Sound on/off | Speaker button top right. Muting stops anything playing. Choice saved; on for a fresh install | BUILT (confirmed on device) |
+| Sound on/off | **Sound effects** switch in Settings. Muting stops anything playing. Choice saved; on for a fresh install | BUILT |
 
 ## 12a. Start menu & quick roll
 
@@ -142,19 +142,20 @@ Files in the app's private folder (`user://`):
 |---|---|---|
 | Start menu | Shown after the splash every launch, over the splash art: **Continue: <current dice>**, Quick roll, Dice sets, History, Settings. The table loads behind it | BUILT |
 | Quick roll | One-tap **1d6**, **2d6**, **1d20**, plus **Custom** (the editor without name or saving; its button reads Roll). Quick rolls are never saved as sets and show as "Quick roll" in the history | BUILT |
-| Settings | Bottom sheet with switches for **Sound effects** (kept in sync with the table's speaker button), **Vibration** and **Fast roll**. All saved | BUILT |
+| Settings | Scrolling bottom sheet with switches for **Sound effects**, **Vibration**, **Fast roll**, **Tap or swipe to roll** and **Menu button on table** (off by default; Back always returns to the menu), plus **Show tips again**. All saved | BUILT |
 | Vibration | Short buzz when dice hit the table, rim or each other (`8–30 ms`, stronger for harder hits), at most one per `60 ms`. Not while shaking in the hand or during the warm-up throw. On by default. On Android 13+ buzzes are sent as media vibrations through the Android API, so they still play when the phone's touch vibration is off (Godot's built-in vibrate counts as touch feedback and gets dropped) | BUILT (confirmed on device) |
 | Fast roll | Off by default. While dice roll, the physics plays out `1.75×` faster (same steps, more per frame, so results are unaffected), and results lift in `0.3 s` instead of `0.6 s` | VERIFY ON DEVICE |
-| Tap or swipe to roll | On by default (switch in Settings). A quick tap on the table does what the main button does: Roll / Pick up, then Throw. A quick upward flick (at least `90 px` within `0.6 s`) throws held dice, harder for faster flicks (`400–2500 px/s` maps to throw power 0–1, like shake strength; never affects which face lands). Drags, long presses and taps while picking or rolling don't roll. Hints read "Tap to roll" / "Shake, flick up or tap to throw" | VERIFY ON DEVICE |
+| Tap or swipe to roll | On by default (switch in Settings). A quick tap on the table does what the main button does: Roll / Pick up, then Throw. A quick upward flick (at least `90 px` within `0.6 s`) throws held dice, harder for faster flicks (`400–2500 px/s` maps to throw power 0–1, like shake strength; never affects which face lands). Drags, long presses and taps while picking or rolling don't roll. Hints read "Tap to roll" / "Shake, flick or tap to throw" | VERIFY ON DEVICE |
+| First-run tips | Until the first throw: over the table, "Tap the table to pick up the dice" with an animated tap ripple, then while holding the dice "Shake the phone, or flick up to throw" with an animated flick. Never block input. Text-only "Press Roll" / "press Throw" versions when Tap or swipe is off. Remembered once done; **Show tips again** in Settings brings them back | VERIFY ON DEVICE |
 | Warm-up throw | A silent, unlogged practice throw runs behind the menu to warm up physics and rendering, to avoid a stutter on the first real roll | VERIFY ON DEVICE |
 
 ## 13. Screen, visuals & controls
 
 | Feature | Spec | Status |
 |---|---|---|
-| Main screen | Menu button (top left), result bar and sound button at top; table in the middle; bottom bar with current set name, History, and main button (Roll / Pick up / Throw / Rolling…) | BUILT |
+| Main screen | Result bar at top (plus a menu button at top left if turned on in Settings); table in the middle; bottom bar with current set name, History, and main button (Roll / Pick up / Throw / Rolling…) | BUILT |
 | Scene | Woven green felt, wood-grain rim, soft shadows, top-down camera tilted slightly towards the player | BUILT |
-| Back button | Android Back closes, in order: a confirmation, the editor, a sheet, then cancels picking/arming, then returns to the start menu; Back on the menu leaves the app | VERIFY ON DEVICE |
+| Back button | Android Back closes, in order: a confirmation, the editor, a sheet, then cancels picking/arming, then returns to the start menu; Back on the menu leaves the app. One press counts once (Android delivers it twice) | BUILT (confirmed on device) |
 | Text entry | Set names and labels use the phone keyboard. Whether the keyboard covers the field being typed into is unconfirmed | VERIFY ON DEVICE |
 
 ## 14. Performance
@@ -181,7 +182,7 @@ Files in the app's private folder (`user://`):
 
 ## 16. Tests
 
-All in `tests/`. Run everything with `tests/run_all.sh` (about 3 minutes), or `tests/run_all.sh --quick` to skip the fairness test. App tests use throwaway `test_*.json` data files and refuse to run without them, so they never touch real sets, history or settings. Tests are excluded from the Android build.
+All in `tests/`. Run everything on the Mac with `tests/run_all.sh` (about 3 minutes; `--quick` skips the fairness test), or on a USB-connected phone with `tests/run_on_device.sh` (about 7 minutes). The phone run uses a separate test copy of the app (**Bag Of Dice Tests**, `com.btgog.bagofdice.tests`, export preset "Bag Of Dice Tests" with the `device_tests` feature), so the real app and its data are never touched; each test writes its results to a file inside that copy, which the script reads back over USB. App tests use throwaway `test_*.json` data files and refuse to run without them, so they never touch real sets, history or settings. Tests are excluded from the Android build.
 
 | Test | What it checks |
 |---|---|

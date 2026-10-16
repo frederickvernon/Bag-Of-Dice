@@ -25,7 +25,7 @@ func _init() -> void:
 	if _checks != EXPECTED_CHECKS:
 		print("\nONLY %d OF %d CHECKS RAN — see errors above" % [_checks, EXPECTED_CHECKS])
 		_failures += 1
-	print("\n%s" % ("ALL %d HISTORY CHECKS PASSED" % _checks if _failures == 0 else "HISTORY TESTS FAILED"))
+	preload("res://tests/test_log.gd").line("%s" % ("ALL %d HISTORY CHECKS PASSED" % _checks if _failures == 0 else "HISTORY TESTS FAILED"))
 	quit(1 if _failures > 0 else 0)
 
 

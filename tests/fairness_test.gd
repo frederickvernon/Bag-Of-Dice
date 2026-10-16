@@ -27,7 +27,8 @@ var _next_progress: float = 0.1
 
 func _ready() -> void:
 	_types = DiceFactory.TYPES.duplicate()
-	for arg: String in OS.get_cmdline_user_args():
+	# On a phone, device_runner.gd passes the args through Engine metadata.
+	for arg: String in OS.get_cmdline_user_args() + Engine.get_meta("device_test_args", PackedStringArray()):
 		var value: String = arg.get_slice("=", 1)
 		if arg.begins_with("--throws="):
 			_throws_per_type = value.to_int()
@@ -116,7 +117,7 @@ func _print_report() -> bool:
 		else:
 			var sides: int = type.substr(1).to_int()
 			all_ok = _print_faces(type, s["counts"], _values(1, sides, 1), s["done"]) and all_ok
-	print("\nOverall: %s" % ("PASS — no die looks biased" if all_ok else "CHECK — at least one die looks biased (see above)"))
+	preload("res://tests/test_log.gd").line("Overall: %s" % ("PASS — no die looks biased" if all_ok else "CHECK — at least one die looks biased (see above)"))
 	print("(With 7 types, one borderline result now and then is normal chance; re-run with more throws to confirm.)")
 	return all_ok
 
@@ -135,7 +136,7 @@ func _print_faces(title: String, counts: Dictionary, faces: Array[int], n: int) 
 	var ok: bool = p >= 0.01
 	print("  %s: expected %.1f per face (%.2f%%)" % [title, expected, 100.0 / faces.size()])
 	print("\n".join(lines))
-	print("  chi-square = %.2f, df = %d, p = %.3f  →  %s" % [chi, df, p, "OK" if ok else "SUSPICIOUS"])
+	preload("res://tests/test_log.gd").line("  %s: chi-square = %.2f, df = %d, p = %.3f  →  %s" % [title, chi, df, p, "OK" if ok else "SUSPICIOUS"])
 	return ok
 
 

@@ -1,5 +1,5 @@
 extends "res://tests/app_test.gd"
-## Vibration and fast roll settings, duplicating a set, copying a roll as text.
+## Vibration, fast roll and menu-button settings, duplicating a set, copying a roll as text.
 
 func _init() -> void:
 	test_name = "SETTINGS & EXTRAS"
@@ -23,7 +23,7 @@ func run() -> void:
 	var saved: AppSettings = AppSettings.new(settings.path)
 	saved.load_settings()
 	check(not haptics.enabled and not saved.haptics and saved.fast_roll, "vibration off and fast roll on are applied and saved")
-	main.call("_go_back")
+	press_back(main)
 
 	# Fast roll speeds up only the roll itself.
 	main.call("_on_set_chosen", store.sets[0]["id"])
@@ -56,6 +56,15 @@ func run() -> void:
 	editor.cancel_editing()
 	check(store.sets.size() == 4, "Duplicate then Cancel adds nothing")
 
+	var menu_button: Control = main.get_node("UI/Root/MenuButton")
+	check(not menu_button.visible, "the table has no menu button by default")
+	sheet.changed.emit("menu_button", true)
+	saved = AppSettings.new(settings.path)
+	saved.load_settings()
+	check(menu_button.visible and saved.menu_button, "Menu button on table shows it, and it's saved")
+	snap("menu_button")
+	sheet.changed.emit("menu_button", false)
+
 	# Copy a roll as text.
 	var entry: Dictionary = RollHistory.make_entry("", "Risk", [
 		{ "type": "d6", "value": 6, "color": "#d23333", "label": "Attack", "parts": [6] },
@@ -72,7 +81,8 @@ func run() -> void:
 	copy_button.pressed.emit()
 	check(copy_button.text == "Copied", "the Copy button confirms with 'Copied'")
 	if DisplayServer.get_name() != "headless":
-		check(DisplayServer.clipboard_get().begins_with("Fireball"), "the clipboard holds the copied roll")
+		await frames(30)  # Android applies clipboard changes on its UI thread, a moment later
+		check(DisplayServer.clipboard_get().begins_with("Fireball"), "the clipboard holds the copied roll: '%s'" % DisplayServer.clipboard_get().left(40))
 
 
 func _find_button(node: Node, text: String) -> Button:

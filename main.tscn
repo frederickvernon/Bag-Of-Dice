@@ -12,11 +12,11 @@
 [ext_resource type="Script" path="res://scripts/ui/history_sheet.gd" id="10_history"]
 [ext_resource type="Script" path="res://scripts/dice_picker.gd" id="11_picker"]
 [ext_resource type="Script" path="res://scripts/dice_sounds.gd" id="12_sounds"]
-[ext_resource type="Script" path="res://scripts/ui/sound_toggle.gd" id="13_soundtoggle"]
 [ext_resource type="Script" path="res://scripts/ui/start_menu.gd" id="14_menu"]
 [ext_resource type="Script" path="res://scripts/ui/settings_sheet.gd" id="15_settings"]
 [ext_resource type="Script" path="res://scripts/ui/menu_icon_button.gd" id="16_menubutton"]
 [ext_resource type="Script" path="res://scripts/dice_haptics.gd" id="17_haptics"]
+[ext_resource type="Script" path="res://scripts/ui/tutorial_overlay.gd" id="18_tutorial"]
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
@@ -96,9 +96,9 @@ script = ExtResource("7_uiroot")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 108.0
+offset_left = 24.0
 offset_top = 24.0
-offset_right = -108.0
+offset_right = -24.0
 offset_bottom = 90.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
@@ -116,19 +116,8 @@ offset_left = 24.0
 offset_top = 24.0
 offset_right = 96.0
 offset_bottom = 96.0
+visible = false
 script = ExtResource("16_menubutton")
-
-[node name="SoundToggle" type="Button" parent="UI/Root"]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -96.0
-offset_top = 24.0
-offset_right = -24.0
-offset_bottom = 96.0
-grow_horizontal = 0
-script = ExtResource("13_soundtoggle")
 
 [node name="BottomBar" type="HBoxContainer" parent="UI/Root"]
 layout_mode = 1
@@ -162,6 +151,16 @@ layout_mode = 2
 theme_type_variation = &"AccentButton"
 theme_override_font_sizes/font_size = 34
 text = "Roll"
+
+[node name="TutorialOverlay" type="Control" parent="UI/Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("18_tutorial")
 
 [node name="StartMenu" type="Control" parent="UI/Root"]
 layout_mode = 1

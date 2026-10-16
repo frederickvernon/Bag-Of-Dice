@@ -13,11 +13,13 @@ extends Node3D
 enum State { IDLE, PICKING, ARMED, ROLLING }
 
 const ARMED_HINT: String = "Shake to roll\nor tap Throw"
-const ARMED_HINT_TAP: String = "Shake, flick up or tap\nto throw"
+const ARMED_HINT_TAP: String = "Shake, flick or tap\nto throw"
 ## A press that moves further than this (pixels) or lasts longer than
 ## TAP_MAX_TIME is a drag or hold, not a tap on the table.
 const TAP_SLOP: float = 24.0
 const TAP_MAX_TIME: float = 0.4
+## Back events closer together than this (ms) count as one press.
+const BACK_REPEAT_MS: int = 300
 ## An upward flick at least this long (pixels) and this quick (seconds) throws
 ## held dice; its speed (pixels/s, between the two values) sets the throw power.
 const SWIPE_MIN_DISTANCE: float = 90.0
@@ -40,12 +42,12 @@ const PICK_HINT: String = "Tap the dice to throw\nHold a die to lock it"
 @onready var _roll_button: Button = $UI/Root/BottomBar/RollButton
 @onready var _history_button: Button = $UI/Root/BottomBar/HistoryButton
 @onready var _history_sheet: HistorySheet = $UI/Root/HistorySheet
-@onready var _sound_toggle: SoundToggle = $UI/Root/SoundToggle
 @onready var _drawer: SetDrawer = $UI/Root/SetDrawer
 @onready var _editor: SetEditor = $UI/Root/SetEditor
 @onready var _menu: StartMenu = $UI/Root/StartMenu
 @onready var _menu_button: MenuIconButton = $UI/Root/MenuButton
 @onready var _settings_sheet: SettingsSheet = $UI/Root/SettingsSheet
+@onready var _tutorial: TutorialOverlay = $UI/Root/TutorialOverlay
 
 var _store: DiceSetStore = DiceSetStore.new()
 var _history: RollHistory = RollHistory.new()
@@ -63,6 +65,7 @@ var _locks: Dictionary = {}
 var _state: State = State.IDLE
 var _autoroll_remaining: int = 0
 var _press_pos: Vector2 = Vector2.ZERO
+var _last_back_ms: int = -1000
 var _press_ms: int = -1
 
 
@@ -99,6 +102,10 @@ func _ready() -> void:
 	_menu.history_pressed.connect(_open_history)
 	_menu.settings_pressed.connect(func() -> void: _settings_sheet.open(_settings))
 	_settings_sheet.changed.connect(_on_setting_changed)
+	_settings_sheet.replay_tips_pressed.connect(func() -> void:
+		_settings.tutorial_done = false
+		_settings.save()
+		_update_tutorial())
 	_roller.die_impact.connect(func(kind: String, speed: float) -> void:
 		if not _warming:
 			_haptics.play_impact(kind, speed))
@@ -116,8 +123,7 @@ func _ready() -> void:
 	_settings.load_settings()
 	_sounds.enabled = _settings.sound
 	_haptics.enabled = _settings.haptics
-	_sound_toggle.set_pressed_no_signal(_settings.sound)
-	_sound_toggle.toggled.connect(_set_sound)
+	_apply_menu_button()
 	var start_id: String = _store.last_set_id
 	var skip_menu: bool = false
 	for arg: String in OS.get_cmdline_user_args():
@@ -210,6 +216,12 @@ func _notification(what: int) -> void:
 ## from the menu it quits.
 ## Back on the menu quits.
 func _go_back() -> void:
+	# On Android one Back press arrives twice (go-back notification and ui_cancel);
+	# act once, or it would step back twice and quit from the menu.
+	var now: int = Time.get_ticks_msec()
+	if now - _last_back_ms < BACK_REPEAT_MS:
+		return
+	_last_back_ms = now
 	if _settings_sheet.is_open():
 		_settings_sheet.close()
 	elif _history_sheet.is_open():
@@ -236,12 +248,14 @@ func _show_menu() -> void:
 		_disarm()
 	_menu.set_continue_name(_current_set.get("name", ""))
 	_menu.visible = true
+	_update_tutorial()
 
 
 func _show_table() -> void:
 	if _warming:
 		_put_on_table(_current_set, _current_set_id)  # stop the practice throw
 	_menu.visible = false
+	_update_tutorial()
 
 
 func _warm_up() -> void:
@@ -276,19 +290,27 @@ func _on_setting_changed(key: String, on: bool) -> void:
 			_settings.save()
 		"tap_to_roll":
 			_settings.tap_to_roll = on
+			_update_tutorial()
 			_settings.save()
 			_put_on_table(_current_set, _current_set_id)  # refresh the hint text
 		"fast_roll":
 			_settings.fast_roll = on
 			_settings.save()
+		"menu_button":
+			_settings.menu_button = on
+			_settings.save()
+			_apply_menu_button()
 
 
-## Sound on/off, from the table's speaker button or the settings sheet.
+## Shows or hides the table's menu button; the result bar uses the space when hidden.
+func _apply_menu_button() -> void:
+	_menu_button.visible = _settings.menu_button
+	_result_label.offset_left = 108.0 if _settings.menu_button else 24.0
+
+
 func _set_sound(on: bool) -> void:
 	_settings.sound = on
 	_settings.save()
-	_sound_toggle.set_pressed_no_signal(on)
-	_sound_toggle.queue_redraw()
 	if not _warming:
 		_sounds.enabled = on
 	if not on:
@@ -442,6 +464,31 @@ func _present_results() -> void:
 			_result_label.get_global_rect().end.y, _roll_button.get_global_rect().position.y)
 
 
+## First-run tips: how to pick up the dice, then how to throw them. Done (and
+## saved) once the player throws for the first time; never during self-tests.
+func _update_tutorial() -> void:
+	if _settings.tutorial_done or _menu.visible or _autoroll_remaining > 0:
+		_tutorial.hide_tip()
+		return
+	var tap: bool = _settings.tap_to_roll
+	match _state:
+		State.IDLE:
+			if _roller.get_dice().is_empty():
+				_tutorial.hide_tip()
+			elif _pick_mode:
+				_tutorial.show_tip("Tap the table to choose\nwhich dice to throw" if tap else "Press Pick up to choose\nwhich dice to throw", "tap" if tap else "")
+			else:
+				_tutorial.show_tip("Tap the table to\npick up the dice" if tap else "Press Roll to\npick up the dice", "tap" if tap else "")
+		State.ARMED:
+			_tutorial.show_tip("Shake the phone,\nor flick up to throw" if tap else "Shake the phone,\nor press Throw", "flick" if tap else "")
+		State.PICKING:
+			_tutorial.hide_tip()  # the picking hint explains it
+		State.ROLLING:
+			_tutorial.hide_tip()
+			_settings.tutorial_done = true
+			_settings.save()
+
+
 func _set_state(new_state: State) -> void:
 	_state = new_state
 	# Fast roll keeps the same physics steps, just more per frame, so results are unaffected.
@@ -476,3 +523,4 @@ func _set_state(new_state: State) -> void:
 			_sets_button.disabled = true
 			_history_button.disabled = true
 			_result_label.text = "Rolling…"
+	_update_tutorial()

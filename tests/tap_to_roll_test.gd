@@ -60,7 +60,7 @@ func run() -> void:
 	check(_state() == "PICKING", "on a pick-dice set a tap starts Pick up")
 	await _tap()
 	check(_state() == "PICKING", "while picking, a tap on empty table doesn't roll")
-	_main.call("_go_back")
+	press_back(_main)
 
 	(_main.get_node("UI/Root/SettingsSheet") as SettingsSheet).changed.emit("tap_to_roll", false)
 	_main.call("_on_set_chosen", store.sets[0]["id"])

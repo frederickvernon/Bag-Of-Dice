@@ -2,21 +2,36 @@ class_name SettingsSheet
 extends BottomSheet
 ## Settings switches. The main screen saves and applies each `changed` value.
 
-## `key` is the AppSettings field ("sound", "haptics", "fast_roll" or "tap_to_roll").
+## `key` is the AppSettings field ("sound", "haptics", "fast_roll", "tap_to_roll" or "menu_button").
 signal changed(key: String, on: bool)
+signal replay_tips_pressed
 
 var _switches: Dictionary = {}  # key -> CheckButton
 
 
 func _build_content(column: VBoxContainer) -> void:
 	set_title("Settings")
-	_add_switch(column, "sound", "Sound effects", "")
-	_add_switch(column, "haptics", "Vibration", "A short buzz when dice hit something")
-	_add_switch(column, "fast_roll", "Fast roll", "Dice roll and show their result faster")
-	_add_switch(column, "tap_to_roll", "Tap or swipe to roll", "Tap the table to roll or throw; flick up to throw held dice")
-	var spacer: Control = Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	column.add_child(spacer)
+	# Scrolls once the options outgrow the sheet on shorter phones.
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	column.add_child(scroll)
+	var list: VBoxContainer = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 18)
+	scroll.add_child(list)
+	_add_switch(list, "sound", "Sound effects", "")
+	_add_switch(list, "haptics", "Vibration", "A short buzz when dice hit something")
+	_add_switch(list, "fast_roll", "Fast roll", "Dice roll and show their result faster")
+	_add_switch(list, "tap_to_roll", "Tap or swipe to roll", "Tap the table to roll or throw; flick up to throw held dice")
+	_add_switch(list, "menu_button", "Menu button on table", "Back also returns to the menu")
+	var replay: Button = Button.new()
+	replay.text = "Show tips again"
+	replay.custom_minimum_size.y = 76
+	replay.pressed.connect(func() -> void:
+		replay_tips_pressed.emit()
+		close())
+	list.add_child(replay)
 
 
 func open(settings: AppSettings) -> void:

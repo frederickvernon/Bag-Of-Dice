@@ -24,7 +24,7 @@ func _init() -> void:
 	if _checks != EXPECTED_CHECKS:
 		print("\nONLY %d OF %d CHECKS RAN — see errors above" % [_checks, EXPECTED_CHECKS])
 		_failures += 1
-	print("\n%s" % ("ALL %d STORE CHECKS PASSED" % _checks if _failures == 0 else "STORE TESTS FAILED"))
+	preload("res://tests/test_log.gd").line("%s" % ("ALL %d STORE CHECKS PASSED" % _checks if _failures == 0 else "STORE TESTS FAILED"))
 	quit(1 if _failures > 0 else 0)
 
 

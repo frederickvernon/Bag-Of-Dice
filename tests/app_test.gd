@@ -7,6 +7,7 @@ extends SceneTree
 ##   -- --sets-file=user://test_sets.json --history-file=user://test_history.json
 ##      --settings-file=user://test_settings.json
 
+const TestLog = preload("res://tests/test_log.gd")
 const FILE_ARGS: Array[String] = ["--sets-file=", "--history-file=", "--settings-file="]
 
 var test_name: String = "TEST"
@@ -26,7 +27,7 @@ func _initialize() -> void:
 
 func _start() -> void:
 	if uses_app and _data_files().size() < FILE_ARGS.size():
-		print("%s: FAIL — needs throwaway data files, e.g. run via tests/run_all.sh" % test_name)
+		TestLog.line("%s: FAIL — needs throwaway data files, e.g. run via tests/run_all.sh" % test_name)
 		quit(1)
 		return
 	create_timer(time_limit).timeout.connect(func() -> void:
@@ -46,6 +47,7 @@ func check(ok: bool, what: String) -> void:
 	print("  %s %s" % ["PASS" if ok else "FAIL", what])
 	if not ok:
 		_failures += 1
+		TestLog.line("  FAIL %s" % what)
 
 
 func finish() -> void:
@@ -56,9 +58,9 @@ func finish() -> void:
 	if _checks == 0:
 		_fail("no checks ran")
 	if _failures == 0:
-		print("%s: ALL %d CHECKS PASSED" % [test_name, _checks])
+		TestLog.line("%s: ALL %d CHECKS PASSED" % [test_name, _checks])
 	else:
-		print("%s: %d OF %d CHECKS FAILED" % [test_name, _failures, _checks])
+		TestLog.line("%s: %d OF %d CHECKS FAILED" % [test_name, _failures, _checks])
 	quit(0 if _failures == 0 else 1)
 
 
@@ -67,6 +69,13 @@ func launch_main() -> Node:
 	var main: Node = (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(main)
 	return main
+
+
+## Presses Back once (clearing the app's guard against Android's doubled
+## Back events, so tests can press it in quick succession).
+func press_back(main: Node) -> void:
+	main.set("_last_back_ms", -1000)
+	main.call("_go_back")
 
 
 func frames(n: int) -> void:
@@ -89,7 +98,7 @@ func snap(shot_name: String) -> void:
 func _fail(what: String) -> void:
 	_checks += 1
 	_failures += 1
-	print("  FAIL %s" % what)
+	TestLog.line("  FAIL %s" % what)
 
 
 func _data_files() -> Array[String]:

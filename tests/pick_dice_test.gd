@@ -59,7 +59,7 @@ func run() -> void:
 	_main.call("_on_roll_button_pressed")  # Pick up again
 	await frames(20)
 	check(picker.picked_groups() == [3], "next time, the locked die starts picked")
-	_main.call("_go_back")
+	press_back(_main)
 	await frames(5)
 	check(not picker.is_active() and button.text == "Pick up", "Back cancels picking")
 

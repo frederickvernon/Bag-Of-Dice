@@ -32,7 +32,7 @@ func run() -> void:
 	var results: Array = await roller.roll_finished
 	check(results.size() == 2 and history.entries[0]["set_name"] == "Quick roll", "a quick roll is logged as 'Quick roll'")
 
-	main.call("_go_back")
+	press_back(main)
 	await frames(5)
 	check(menu.visible and (menu.get("_continue_button") as Button).text == "Continue: Quick roll",
 			"Back goes to the menu, and Continue offers the quick roll")
@@ -46,22 +46,33 @@ func run() -> void:
 	check(not menu.visible and roller.get_dice().size() == 2 and store.sets.size() == 3,
 			"a custom quick roll goes to the table and isn't saved as a set")
 
-	main.call("_go_back")
+	press_back(main)
 	menu.sets_pressed.emit()
 	await frames(20)
 	(main.get_node("UI/Root/SetDrawer") as SetDrawer).set_chosen.emit(store.sets[1]["id"])
 	await frames(5)
 	check(not menu.visible and sets_button.text == "Risk", "choosing a set from the menu goes to the table")
 
-	main.call("_go_back")
+	press_back(main)
 	menu.settings_pressed.emit()
 	await frames(20)
 	var settings: SettingsSheet = main.get_node("UI/Root/SettingsSheet")
 	settings.changed.emit("sound", false)
 	await frames(3)
-	check(not (main.get_node("UI/Root/SoundToggle") as SoundToggle).button_pressed
-			and not (main.get_node("DiceSounds") as DiceSounds).enabled,
-			"muting in Settings also updates the table's speaker button")
-	main.call("_go_back")
+	check(not (main.get_node("DiceSounds") as DiceSounds).enabled and not (main.get("_settings") as AppSettings).sound,
+			"muting in Settings turns the sounds off")
+	press_back(main)
 	await frames(20)
 	check(not settings.is_open() and menu.visible, "Back closes Settings, leaving the menu")
+
+	# Android sends one Back press as two events; it must only step back once.
+	menu.continue_pressed.emit()
+	await frames(5)
+	var cancel: InputEventAction = InputEventAction.new()
+	cancel.action = "ui_cancel"
+	cancel.pressed = true
+	main.set("_last_back_ms", -1000)
+	main.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	main.call("_unhandled_input", cancel)
+	await frames(5)
+	check(menu.visible, "one Back press on the table (sent twice, as Android does) goes to the menu, not out of the app")

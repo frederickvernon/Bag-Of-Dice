@@ -12,6 +12,8 @@ config_version=5
 
 config/name="Bag Of Dice"
 run/main_scene="res://main.tscn"
+run/main_scene.device_tests="res://tests/device_empty.tscn"
+run/main_loop_type.device_tests="DeviceTestRunner"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "Mobile")
 boot_splash/bg_color=Color(0.2, 0.13, 0.08, 1)

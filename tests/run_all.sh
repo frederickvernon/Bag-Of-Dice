@@ -25,7 +25,8 @@ run_test() {
 	printf "%-22s " "$name"
 	local out
 	out=$(perl -e 'alarm 300; exec @ARGV' "$GODOT" --headless --path . "$@" 2>&1)
-	if [ $? -eq 0 ]; then
+	# Exit code 0 and the test's own "passed" line (a test that quits early has no such line).
+	if [ $? -eq 0 ] && echo "$out" | grep -qE "CHECKS PASSED|Overall: PASS"; then
 		echo "PASS  $(echo "$out" | grep -oE 'ALL [0-9]+ [A-Z ]*CHECKS PASSED|Overall: PASS' | tail -1)"
 		passed=$((passed + 1))
 	else
@@ -35,6 +36,9 @@ run_test() {
 		failed_names+=("$name")
 	fi
 }
+
+# Results file the tests also write (for phones); not needed on the Mac.
+rm -f "$HOME/Library/Application Support/Godot/app_userdata/Bag Of Dice/test_results.log"
 
 echo "Importing project…"
 "$GODOT" --headless --path . --import >/dev/null 2>&1
@@ -53,10 +57,12 @@ run_test "Re-roll"           -s res://tests/reroll_test.gd -- "${DATA[@]}"
 run_test "Sound switch"      -s res://tests/sound_switch_test.gd -- "${DATA[@]}"
 run_test "Settings & extras" -s res://tests/settings_extras_test.gd -- "${DATA[@]}"
 run_test "Tap to roll"       -s res://tests/tap_to_roll_test.gd -- "${DATA[@]}"
+run_test "Tutorial"          -s res://tests/tutorial_test.gd -- "${DATA[@]}"
 if [ $QUICK -eq 0 ]; then
 	run_test "Fairness"      res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=2000
 fi
 
+rm -f "$HOME/Library/Application Support/Godot/app_userdata/Bag Of Dice/test_results.log"
 echo
 echo "$passed passed, $failed failed"
 if [ $failed -gt 0 ]; then

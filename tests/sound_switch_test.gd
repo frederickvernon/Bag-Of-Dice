@@ -8,15 +8,15 @@ func _init() -> void:
 func run() -> void:
 	var main: Node = launch_main()
 	await frames(2)
-	var toggle: SoundToggle = main.get_node("UI/Root/SoundToggle")
+	var sheet: SettingsSheet = main.get_node("UI/Root/SettingsSheet")
 	var sounds: DiceSounds = main.get_node("DiceSounds")
 	var settings: AppSettings = main.get("_settings")
 	# The engine is muted during the menu's practice throw; check the setting.
-	check(toggle.button_pressed and settings.sound, "sound is on by default")
+	check(settings.sound, "sound is on by default")
 
-	toggle.button_pressed = false  # same as a tap
+	sheet.changed.emit("sound", false)  # the Sound effects switch
 	await frames(5)
-	check(not sounds.enabled, "tapping the speaker mutes the sounds")
+	check(not sounds.enabled, "switching Sound effects off mutes the sounds")
 	main.call("_on_set_chosen", (main.get("_store") as DiceSetStore).sets[0]["id"])
 	main.call("_start_roll")
 	var players: Array = sounds.get("_players")
@@ -33,5 +33,5 @@ func run() -> void:
 	await frames(2)
 	var again: Node = launch_main()
 	await frames(2)
-	check(not (again.get_node("UI/Root/SoundToggle") as SoundToggle).button_pressed
-			and not (again.get_node("DiceSounds") as DiceSounds).enabled, "muted is remembered on the next launch")
+	check(not (again.get("_settings") as AppSettings).sound and not (again.get_node("DiceSounds") as DiceSounds).enabled,
+			"muted is remembered on the next launch")
