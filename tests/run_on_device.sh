@@ -1,7 +1,8 @@
 #!/bin/bash
 # Runs the test suite on a connected Android phone, in a separate test copy of
 # the app ("Bag Of Dice Tests", package com.btgog.bagofdice.tests), so the real
-# app and its data are never touched. Needs USB debugging and the Android SDK.
+# app and its data are never touched. The test copy is uninstalled when the run
+# ends, however it ends. Needs USB debugging and the Android SDK.
 #
 #   tests/run_on_device.sh            every test (the fairness test is shortened)
 #   tests/run_on_device.sh --quick    everything except the fairness test
@@ -13,6 +14,14 @@ PKG=com.btgog.bagofdice.tests
 APK="${TMPDIR:-/tmp}/bag_of_dice_tests.apk"
 QUICK=0
 [ "${1:-}" = "--quick" ] && QUICK=1
+
+# Always remove the test copy from the phone afterwards.
+cleanup() {
+	"$ADB" shell am force-stop $PKG >/dev/null 2>&1
+	"$ADB" uninstall $PKG >/dev/null 2>&1 && echo "Test copy removed from the phone."
+	rm -f "$APK"
+}
+trap cleanup EXIT
 
 echo "Building and installing the test copy…"
 "$GODOT" --headless --path . --export-debug "Bag Of Dice Tests" "$APK" >/dev/null 2>&1 || { echo "Export failed"; exit 1; }
@@ -28,7 +37,7 @@ run_test() {
 	local name="$1" spec="$2" limit=$(( ${3:-4} * 60 ))
 	printf "%-22s " "$name"
 	"$ADB" shell am force-stop $PKG
-	"$ADB" shell "echo '$spec' | run-as $PKG sh -c 'cat > files/next_test.txt; rm -f files/test_results.log'"
+	"$ADB" shell "echo '$spec' | run-as $PKG sh -c 'mkdir -p files && cat > files/next_test.txt; rm -f files/test_results.log'"
 	"$ADB" shell am start -n $PKG/com.godot.game.GodotAppLauncher >/dev/null 2>&1
 	sleep 3
 	local waited=0

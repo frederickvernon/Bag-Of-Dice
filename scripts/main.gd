@@ -13,7 +13,7 @@ extends Node3D
 enum State { IDLE, PICKING, ARMED, ROLLING }
 
 const ARMED_HINT: String = "Shake to roll\nor tap Throw"
-const ARMED_HINT_TAP: String = "Shake, flick or tap\nto throw"
+const ARMED_HINT_TAP: String = "Shake or swipe to rattle,\nflick or tap to throw"
 ## A press that moves further than this (pixels) or lasts longer than
 ## TAP_MAX_TIME is a drag or hold, not a tap on the table.
 const TAP_SLOP: float = 24.0
@@ -25,6 +25,12 @@ const BACK_REPEAT_MS: int = 300
 const SWIPE_MIN_DISTANCE: float = 90.0
 const SWIPE_MAX_TIME: float = 0.6
 const SWIPE_SPEED_RANGE: Vector2 = Vector2(400.0, 2500.0)
+## A flick at the end of a longer drag (e.g. after rattling) is judged on the
+## last FLICK_WINDOW seconds of movement, which must go at least FLICK_MIN_DISTANCE up.
+const FLICK_WINDOW: float = 0.15
+const FLICK_MIN_DISTANCE: float = 60.0
+## Sideways finger speed (pixels/s) that rattles held dice gently, and hardest.
+const RATTLE_SPEED_RANGE: Vector2 = Vector2(250.0, 2200.0)
 ## Engine time scale while rolling with Fast roll on.
 const FAST_ROLL_SPEED: float = 1.75
 const PICK_HINT: String = "Tap the dice to throw\nHold a die to lock it"
@@ -67,6 +73,10 @@ var _autoroll_remaining: int = 0
 var _press_pos: Vector2 = Vector2.ZERO
 var _last_back_ms: int = -1000
 var _press_ms: int = -1
+## Recent finger positions during a press: [msec, Vector2], for judging flicks.
+var _drag_samples: Array = []
+## 0–1: how hard the held dice are being rattled by swiping (fades when you stop).
+var _drag_rattle: float = 0.0
 
 
 func _ready() -> void:
@@ -149,8 +159,9 @@ func _ready() -> void:
 		_start_roll()
 
 
-func _process(_delta: float) -> void:
-	_hand.shake_level = _shake.level
+func _process(delta: float) -> void:
+	_drag_rattle = maxf(0.0, _drag_rattle - delta * 2.0)
+	_hand.shake_level = maxf(_shake.level, _drag_rattle)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -162,6 +173,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if _settings.tap_to_roll:
+		if event is InputEventMouseMotion and _press_ms >= 0:
+			_on_drag(event as InputEventMouseMotion)
+			return
 		var gesture: Dictionary = _table_gesture(event)
 		if gesture.get("kind") == "tap":
 			get_viewport().set_input_as_handled()
@@ -188,22 +202,52 @@ func _table_gesture(event: InputEvent) -> Dictionary:
 	if not event is InputEventMouseButton or (event as InputEventMouseButton).button_index != MOUSE_BUTTON_LEFT:
 		return {}
 	var mb: InputEventMouseButton = event
+	var now: int = Time.get_ticks_msec()
 	if mb.pressed:
 		_press_pos = mb.position
-		_press_ms = Time.get_ticks_msec()
+		_press_ms = now
+		_drag_samples = [[now, mb.position]]
 		return {}
 	if _press_ms < 0:
 		return {}
-	var seconds: float = (Time.get_ticks_msec() - _press_ms) / 1000.0
+	var seconds: float = (now - _press_ms) / 1000.0
 	var moved: Vector2 = mb.position - _press_pos
 	_press_ms = -1
 	if moved.length() <= TAP_SLOP:
 		return { "kind": "tap" } if seconds <= TAP_MAX_TIME else {}
+	# A quick swipe up from the press...
 	var upward: bool = -moved.y >= SWIPE_MIN_DISTANCE and -moved.y > absf(moved.x) * 1.2
 	if upward and seconds <= SWIPE_MAX_TIME:
-		var speed: float = moved.length() / maxf(seconds, 0.016)
-		return { "kind": "swipe", "power": clampf(inverse_lerp(SWIPE_SPEED_RANGE.x, SWIPE_SPEED_RANGE.y, speed), 0.0, 1.0) }
+		return { "kind": "swipe", "power": _flick_power(moved.length() / maxf(seconds, 0.016)) }
+	# ...or a flick up at the end of a longer drag, such as after rattling.
+	var start: Array = _drag_samples[0]
+	for sample: Array in _drag_samples:
+		if now - (sample[0] as int) <= int(FLICK_WINDOW * 1000.0):
+			break
+		start = sample
+	var recent: Vector2 = mb.position - (start[1] as Vector2)
+	var recent_seconds: float = maxf((now - (start[0] as int)) / 1000.0, 0.016)
+	if -recent.y >= FLICK_MIN_DISTANCE and -recent.y > absf(recent.x) * 1.2 and recent_seconds <= FLICK_WINDOW * 2.0:
+		return { "kind": "swipe", "power": _flick_power(recent.length() / recent_seconds) }
 	return {}
+
+
+## Finger moving while pressed: kept for flick detection, and swiping side to
+## side over held dice rattles them like a shake.
+func _on_drag(mm: InputEventMouseMotion) -> void:
+	var now: int = Time.get_ticks_msec()
+	_drag_samples.append([now, mm.position])
+	while _drag_samples.size() > 2 and now - (_drag_samples[1][0] as int) > int(FLICK_WINDOW * 2000.0):
+		_drag_samples.pop_front()
+	if _state == State.ARMED:
+		var sideways: float = absf(mm.velocity.x)
+		if sideways > absf(mm.velocity.y) and sideways >= RATTLE_SPEED_RANGE.x:
+			_drag_rattle = maxf(_drag_rattle, clampf(inverse_lerp(RATTLE_SPEED_RANGE.x, RATTLE_SPEED_RANGE.y, sideways), 0.15, 1.0))
+			_result_label.text = "Rattling…"
+
+
+func _flick_power(speed: float) -> float:
+	return clampf(inverse_lerp(SWIPE_SPEED_RANGE.x, SWIPE_SPEED_RANGE.y, speed), 0.0, 1.0)
 
 
 func _notification(what: int) -> void:
@@ -480,7 +524,7 @@ func _update_tutorial() -> void:
 			else:
 				_tutorial.show_tip("Tap the table to\npick up the dice" if tap else "Press Roll to\npick up the dice", "tap" if tap else "")
 		State.ARMED:
-			_tutorial.show_tip("Shake the phone,\nor flick up to throw" if tap else "Shake the phone,\nor press Throw", "flick" if tap else "")
+			_tutorial.show_tip("Shake the phone, or swipe\nside to side to rattle.\nFlick up to throw." if tap else "Shake the phone,\nor press Throw", "flick" if tap else "")
 		State.PICKING:
 			_tutorial.hide_tip()  # the picking hint explains it
 		State.ROLLING:

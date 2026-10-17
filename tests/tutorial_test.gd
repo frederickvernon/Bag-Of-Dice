@@ -24,7 +24,7 @@ func run() -> void:
 	snap("tip_tap")
 	main.call("_on_roll_button_pressed")
 	await frames(30)
-	check(tip.visible and label.text.contains("flick up") and tip.get("_kind") == "flick",
+	check(tip.visible and label.text.to_lower().contains("flick up") and tip.get("_kind") == "flick",
 			"holding the dice: 'flick up to throw' with a flick animation")
 	snap("tip_flick")
 	main.call("_on_roll_button_pressed")

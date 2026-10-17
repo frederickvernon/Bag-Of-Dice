@@ -22,10 +22,11 @@ func _ready() -> void:
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.anchor_left = 0.12
 	_panel.anchor_right = 0.88
-	# Upper part of the table, clear of the dice lying in the middle.
-	_panel.anchor_top = 0.3
-	_panel.anchor_bottom = 0.3
-	_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	# Just below the result bar, growing downward: clear of the bar and of the
+	# dice lying in the middle.
+	_panel.anchor_top = 0.165
+	_panel.anchor_bottom = 0.165
+	_panel.grow_vertical = Control.GROW_DIRECTION_END
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0, 0, 0, 0.62)
 	style.set_corner_radius_all(22)
@@ -45,7 +46,7 @@ func _ready() -> void:
 	_label = Label.new()
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_label.add_theme_font_size_override("font_size", 30)
+	_label.add_theme_font_size_override("font_size", 27)
 	column.add_child(_label)
 
 
@@ -80,14 +81,18 @@ func _draw_gesture() -> void:
 		ripple.a = 1.0 - t
 		_gesture.draw_arc(c, 18.0 + t * 42.0, 0.0, TAU, 48, ripple, 4.0, true)
 	elif _kind == "flick":
-		# A dot sliding upward, leaving a fading trail, with an arrow head.
-		var top: Vector2 = c + Vector2(0, -42)
+		# Side to side at the bottom (rattling), then a flick up with an arrow head.
 		var bottom: Vector2 = c + Vector2(0, 42)
-		var eased: float = ease(minf(t / 0.7, 1.0), 0.4)
-		var dot: Vector2 = bottom.lerp(top, eased)
-		var fade: Color = ink
-		fade.a = 1.0 - maxf(t - 0.7, 0.0) / 0.3
-		_gesture.draw_line(bottom, dot, Color(ink, 0.35 * fade.a), 10.0, true)
-		_gesture.draw_circle(dot, 14.0, fade)
+		var top: Vector2 = c + Vector2(0, -42)
+		var dot: Vector2
+		var fade: float = 1.0
+		if t < 0.5:
+			dot = bottom + Vector2(sin(t / 0.5 * TAU * 2.0) * 34.0, 0)
+		else:
+			var up: float = ease(minf((t - 0.5) / 0.3, 1.0), 0.4)
+			dot = bottom.lerp(top, up)
+			fade = 1.0 - maxf(t - 0.8, 0.0) / 0.2
+			_gesture.draw_line(bottom, dot, Color(ink, 0.35 * fade), 10.0, true)
+		_gesture.draw_circle(dot, 14.0, Color(ink, fade))
 		_gesture.draw_polyline(PackedVector2Array([top + Vector2(-16, 18), top, top + Vector2(16, 18)]),
 				Color(ink, 0.8), 5.0, true)

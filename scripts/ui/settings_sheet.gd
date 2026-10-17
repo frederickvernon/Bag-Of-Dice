@@ -23,7 +23,7 @@ func _build_content(column: VBoxContainer) -> void:
 	_add_switch(list, "sound", "Sound effects", "")
 	_add_switch(list, "haptics", "Vibration", "A short buzz when dice hit something")
 	_add_switch(list, "fast_roll", "Fast roll", "Dice roll and show their result faster")
-	_add_switch(list, "tap_to_roll", "Tap or swipe to roll", "Tap the table to roll or throw; flick up to throw held dice")
+	_add_switch(list, "tap_to_roll", "Tap or swipe to roll", "Tap the table to roll or throw; swipe side to side to rattle held dice, flick up to throw")
 	_add_switch(list, "menu_button", "Menu button on table", "Back also returns to the menu")
 	var replay: Button = Button.new()
 	replay.text = "Show tips again"
