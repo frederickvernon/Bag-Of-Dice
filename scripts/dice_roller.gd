@@ -10,6 +10,8 @@ signal roll_finished(results: Array[Dictionary])
 ## A die hit something, for sound effects. `kind`: "felt" (the table top),
 ## "wood" (the rim), "click" (another die) or "cup" (the hand holding them).
 signal die_impact(kind: String, speed: float)
+## Debug builds only: a die is about to be hopped or re-thrown. `info` is diagnose()'s answer.
+signal debug_event(die: Die, info: Dictionary)
 
 ## Keep in step with Table.size.
 @export var table_size: Vector2 = Vector2(9.0, 15.0)
@@ -35,6 +37,12 @@ signal die_impact(kind: String, speed: float)
 ## Print nudges / re-throws to the Output panel.
 @export var log_events: bool = true
 
+## Debug builds only: the next roll gets a problem landing once its dice settle,
+## to try out hops and re-throws. "lean": a die leaning on the rim; "stack": a die on another die.
+var debug_force: String = ""
+## Tilt (degrees) of the "lean" debug landing.
+var debug_lean_degrees: float = 30.0
+
 ## Counters for the fairness test.
 var nudge_count: int = 0
 var rethrow_count: int = 0
@@ -48,6 +56,7 @@ var _rolling: bool = false
 var _throw_pending: bool = false
 var _power: float = 0.5
 var _from_current: bool = false
+var _force_pending: bool = false
 
 
 ## Replaces the dice on the table. Each spec: { "type": "d6", "style": "pips",
@@ -162,6 +171,7 @@ func roll(power: float = 0.5, from_current_positions: bool = false) -> void:
 	_from_current = from_current_positions
 	_throw_pending = true
 	_rolling = true
+	_force_pending = OS.is_debug_build() and not debug_force.is_empty()
 
 
 func _physics_process(delta: float) -> void:
@@ -182,7 +192,7 @@ func _physics_process(delta: float) -> void:
 	# Safety net: re-throw a die that escapes the walls instead of letting it fall forever.
 	for d: Die in _active:
 		if _is_off_table(d):
-			_log("%s left the table — re-throwing it" % d.name)
+			_report(d, "left the table", "re-throwing it")
 			_rethrow(d)
 
 	# Update every die each frame (no early exit) so rest timers stay accurate.
@@ -193,8 +203,13 @@ func _physics_process(delta: float) -> void:
 	if not all_resting:
 		for d: Die in _active:
 			if d.get_moving_time() > roll_timeout:
-				_log("%s still moving after %.0f s — re-throwing it" % [d.name, roll_timeout])
+				_report(d, "still moving after %.0f s" % roll_timeout, "re-throwing it")
 				_rethrow(d)
+		return
+
+	if _force_pending:
+		_force_pending = false
+		_apply_debug_force()
 		return
 
 	# All stopped. Fix any die not flat on the table with a clear top face, then wait again.
@@ -203,25 +218,29 @@ func _physics_process(delta: float) -> void:
 		if not _is_on_table(d):
 			# On other dice: re-throw, since a nudge could disturb the dice underneath.
 			any_cocked = true
-			_log("%s landed on top of another die — re-throwing it" % d.name)
+			_report(d, "landed on top of another die", "re-throwing it")
 			_rethrow(d)
 			continue
 		if d.get_top_face() != -1:
+			d.ease_flat()
 			continue
 		any_cocked = true
 		if d.nudges < max_nudges:
 			d.nudges += 1
 			nudge_count += 1
-			_log("%s is cocked — nudging (%d/%d)" % [d.name, d.nudges, max_nudges])
+			_report(d, "cocked", "nudging (%d/%d)" % [d.nudges, max_nudges])
 			d.nudge()
 		else:
-			_log("%s still cocked — re-throwing it" % d.name)
+			_report(d, "still cocked", "re-throwing it")
 			_rethrow(d)
 	if any_cocked:
 		return
 
 	_rolling = false
-	roll_finished.emit(_collect_results())
+	var results: Array[Dictionary] = _collect_results()
+	for d: Die in _active:
+		d.bake_visual()
+	roll_finished.emit(results)
 
 
 ## Classifies a hit for sound: the wooden rim is a mostly sideways hit near a wall, otherwise felt.
@@ -320,6 +339,73 @@ func _start_positions(count: int) -> Array[Vector3]:
 	for i: int in count:
 		picked.append(slots[i] + Vector3(randf_range(-0.15, 0.15), 0.0, randf_range(-0.15, 0.15)))
 	return picked
+
+
+## Why a die is being hopped or re-thrown, for the debug overlay and the log:
+## { "die", "rule", "action", "tilt" and "threshold" (degrees), "lowest" (corner height
+## above the felt), "touching" (e.g. ["felt", "rim", "D6-3"]) }.
+func diagnose(d: Die, rule: String, action: String = "") -> Dictionary:
+	return {
+		"die": str(d.name), "rule": rule, "action": action,
+		"tilt": d.get_tilt_degrees(), "threshold": d.readable_limit_degrees(),
+		"lowest": d.get_lowest_point() - global_position.y, "touching": touching(d),
+	}
+
+
+## What the die is in contact with: "felt", "rim" (the table's sides), "cup", or other dice by name.
+func touching(d: Die) -> Array[String]:
+	var found: Array[String] = []
+	var state: PhysicsDirectBodyState3D = PhysicsServer3D.body_get_direct_state(d.get_rid())
+	if state == null:
+		return found
+	for i: int in state.get_contact_count():
+		var other: Object = state.get_contact_collider_object(i)
+		var what: String = "cup"
+		if other is Die:
+			what = str((other as Die).name)
+		elif other is Table:
+			what = "felt" if to_local(state.get_contact_collider_position(i)).y < 0.05 else "rim"
+		if not found.has(what):
+			found.append(what)
+	return found
+
+
+func _report(d: Die, rule: String, action: String) -> void:
+	if not (log_events or OS.is_debug_build()):
+		return
+	var info: Dictionary = diagnose(d, rule, action)
+	var contacts: Array = info["touching"]
+	_log("%s %s — %s (tilt %.1f°, limit %.1f°, lowest corner %.3f, touching %s)" % [
+			d.name, rule, action, info["tilt"], info["threshold"], info["lowest"],
+			"nothing" if contacts.is_empty() else ", ".join(contacts)])
+	if OS.is_debug_build():
+		debug_event.emit(d, info)
+
+
+## Debug builds: makes one settled die land badly, then lets physics settle it again.
+func _apply_debug_force() -> void:
+	var d: Die = _active.pick_random()
+	if debug_force == "stack" and _active.size() > 1:
+		var under: Die = _active[0] if d != _active[0] else _active[1]
+		var basis: Basis = d.resting_basis(randf() * TAU)
+		var top: float = -INF
+		for c: Vector3 in under.corners:
+			top = maxf(top, to_local(under.global_transform * c).y)
+		var p: Vector3 = to_local(under.global_position)
+		p.y = top + d.rest_height(basis) + 0.02
+		d.throw(to_global(p), global_basis * basis, Vector3.ZERO, Vector3.ZERO)
+		_log("Debug: %s placed on top of %s" % [d.name, under.name])
+		return
+	# Lean against the right-hand rim: tilted about the table's long axis, raised side against the rim.
+	var half: Vector2 = table_size * 0.5
+	var basis: Basis = Basis(Vector3.BACK, deg_to_rad(debug_lean_degrees)) * d.resting_basis(0.0)
+	var reach: float = 0.0
+	for c: Vector3 in d.corners:
+		reach = maxf(reach, (basis * c).x)
+	var z: float = clampf(to_local(d.global_position).z, -half.y + 1.5, half.y - 2.5)
+	d.throw(to_global(Vector3(half.x - reach - 0.01, d.rest_height(basis) + 0.01, z)),
+			global_basis * basis, Vector3.ZERO, Vector3.ZERO)
+	_log("Debug: %s leaned on the rim at %.0f°" % [d.name, debug_lean_degrees])
 
 
 func _log(message: String) -> void:

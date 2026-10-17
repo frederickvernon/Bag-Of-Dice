@@ -60,7 +60,10 @@ All dice are generated in code from their face directions, so every shape is sym
 | Feature | Spec | Status |
 |---|---|---|
 | At rest | A die is settled once slower than `0.1` units/s and rad/s for `0.4 s`. Results are read only when every thrown die is settled | BUILT |
-| Cocked die | If the best face is more than `10°` from straight up, that die alone gets a small hop, up to `3` times, then is re-thrown on its own | BUILT |
+| Readable or cocked | Each type has its own limit: half the angle between neighbouring face directions, times a fraction (`0.5` for every type, set per type in one table in `die.gd`). Limits: d4 `27.4°` (read from its corners), d6 `22.5°`, d8 `17.6°`, d10 `13.0°`, d12 `15.9°`, d20 `10.5°`. Within the limit the die is read with no hop, even if it leans on the rim or another die. Past it, it's cocked. Decided from tilt and position only, never the value shown | BUILT |
+| Hop | A cocked die alone gets a gentle hop (mostly lift `3.5`, little spin `0.12`), up to `3` times, then is re-thrown on its own. In testing, no hop landed a die beyond the two faces it was leaning between, and about 3 in 4 hops freed the die | VERIFY ON DEVICE |
+| Easing flat | A readable die that's tilted eases flat onto the face it was read from while other dice are still being sorted out. Only the visible die moves, never the physics body, so the result can't change | VERIFY ON DEVICE |
+| Debug tools | Debug builds only. **Debug landing** at the bottom of Settings forces a die to lean on the rim or land on another die on every throw (resets when the app restarts). While it's on, every hop or re-throw gets a numbered tag over the die and a line in a panel under the result bar: the rule, tilt against the limit, lowest corner height and what the die touches | BUILT |
 | Landed on another die | If a resting die's lowest corner is more than `0.15` above the felt, it's lying on another die and is re-thrown on its own | BUILT |
 | Safety nets | A die that leaves the table is re-thrown. A die moving continuously for `10 s` is re-thrown; the timer is per die and restarts on every throw or hop | BUILT |
 
@@ -98,6 +101,7 @@ For games where only some of a set's dice are thrown at a time, e.g. one Risk se
 |---|---|---|
 | A set | Name (max `40` chars), pick-dice option, list of dice. Each die: type and face style, colour, optional label (max `24` chars) | BUILT |
 | Dice limit | Max `20` physical dice per set. A d100 counts as 2 (max 10 d100s). "+ d100" disabled when only one place is left; switching a die to d100 in a full set is refused with an explanation | BUILT |
+| Scrolling lists | Settings, the drawer, the editor and the history scroll by dragging anywhere, including on a switch or button; a drag never presses what it started on | BUILT |
 | Drawer | Set-name button (bottom left) slides up a sheet listing sets as cards: name, colour dots, summary (e.g. "8d6"), "· pick dice" where relevant. Current set outlined. Tap a card to pull the set out; tap outside or Close to dismiss | BUILT |
 | Duplicate | **Duplicate** button at the top of the editor turns the set being edited into a new unsaved copy named "<name> (copy)"; Save adds it, Cancel discards it | BUILT |
 | Editor | Name, pick-dice switch, a row per die (colour swatch, type + style, label, remove), quick-add buttons per type. New die takes the previous die's colour. Save disabled until there's a name and at least one die. Delete asks for confirmation. Saving puts the set on the table | BUILT |
@@ -219,7 +223,10 @@ All in `tests/`. Run everything on the Mac with `tests/run_all.sh` (about 3 minu
 | Sound switch (`sound_switch_test.gd`) | On by default, muting silences a roll, remembered next launch |
 | Entitlements (`entitlements_test.gd`) | 23 checks: default free, cache, damaged/wrong-shape files, store answer vs cache, every purchase outcome, pending → declined / confirmed, acknowledgement, restore (none / restored / unavailable) across restarts, double tap, colour and set helpers |
 | Settings & extras (`settings_extras_test.gd`) | Vibration and fast-roll switches applied and saved, fast roll only while rolling, Duplicate (and Duplicate + Cancel), copying a roll as text |
+| Drag scroll (`drag_scroll_test.gd`) | Dragging from a switch scrolls the Settings list without flipping it; a plain tap still flips it |
+| Readability (`readability_test.gd`) | Every type reads a die inside its limit and refuses one past it; d4 limit; a d6 leaning on the rim inside its limit is read with no hop and eases flat without changing its result; past the limit it's hopped; hop outcomes over many forced ambiguous landings (fewer on the phone) |
 | Fairness (`fairness_test.tscn`) | Thousands of throws per die type, chi-square per die |
+| Re-throw diagnosis (`rethrow_diagnosis.tscn`) | Not pass/fail and not in the run-all scripts: hundreds of real rolls, reporting why dice were hopped or re-thrown, how flat accepted dice lie, parked-dice contact and which rim lean angles hold |
 
 ## 17. Out of scope
 
@@ -238,3 +245,5 @@ All in `tests/`. Run everything on the Mac with `tests/run_all.sh` (about 3 minu
 2. Confirm the `VERIFY ON DEVICE` items on the phone, especially shake feel, keyboard in the editor, Back gesture, icon and splash, and the first-roll pause
 3. Free & Pro, remaining steps: developer panel, gating and limit sheets, upgrade screen / restore / tier display, downgrade behaviour and grandfathering
 4. Real Google Play Billing provider and plugin, Play Console product setup (needs a developer account)
+5. Re-throw modes (spec in progress): steps 3–9 to come
+6. The visible dice have rounded edges but their collision shapes are sharp, so a leaning die looks about 0.03 above the felt. Left as is unless it bothers the player

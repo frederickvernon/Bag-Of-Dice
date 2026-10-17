@@ -79,6 +79,8 @@ run_test "Sound switch"      "res://tests/sound_switch_test.gd"
 run_test "Settings & extras" "res://tests/settings_extras_test.gd"
 run_test "Tap to roll"       "res://tests/tap_to_roll_test.gd"
 run_test "Tutorial"          "res://tests/tutorial_test.gd"
+run_test "Drag scroll"       "res://tests/drag_scroll_test.gd"
+run_test "Readability"       "res://tests/readability_test.gd --hop-samples=12" 6
 if [ $QUICK -eq 0 ]; then
 	run_test "Fairness"      "res://tests/fairness_test.tscn --throws=600" 15
 fi

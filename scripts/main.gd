@@ -112,6 +112,14 @@ func _ready() -> void:
 	_menu.history_pressed.connect(_open_history)
 	_menu.settings_pressed.connect(func() -> void: _settings_sheet.open(_settings))
 	_settings_sheet.changed.connect(_on_setting_changed)
+	if OS.is_debug_build():
+		var overlay: RethrowDebugOverlay = RethrowDebugOverlay.new()
+		add_child(overlay)
+		overlay.watch(_roller)
+		# The overlay only shows while a debug landing is chosen.
+		_settings_sheet.debug_force_changed.connect(func(kind: String) -> void:
+			_roller.debug_force = kind
+			overlay.enabled = not kind.is_empty())
 	_settings_sheet.replay_tips_pressed.connect(func() -> void:
 		_settings.tutorial_done = false
 		_settings.save()

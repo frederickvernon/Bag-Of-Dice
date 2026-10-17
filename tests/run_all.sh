@@ -60,6 +60,8 @@ run_test "Sound switch"      -s res://tests/sound_switch_test.gd -- "${DATA[@]}"
 run_test "Settings & extras" -s res://tests/settings_extras_test.gd -- "${DATA[@]}"
 run_test "Tap to roll"       -s res://tests/tap_to_roll_test.gd -- "${DATA[@]}"
 run_test "Tutorial"          -s res://tests/tutorial_test.gd -- "${DATA[@]}"
+run_test "Drag scroll"       -s res://tests/drag_scroll_test.gd -- "${DATA[@]}"
+run_test "Readability"       -s res://tests/readability_test.gd --fixed-fps 120 -- "${DATA[@]}"
 if [ $QUICK -eq 0 ]; then
 	run_test "Fairness"      res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=2000 "${DATA[@]}"
 fi
