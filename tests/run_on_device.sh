@@ -6,6 +6,7 @@
 #
 #   tests/run_on_device.sh            every test (the fairness test is shortened)
 #   tests/run_on_device.sh --quick    everything except the fairness test
+#   tests/run_on_device.sh --only="Shake cup,App flows"   just those tests
 
 cd "$(dirname "$0")/.." || exit 1
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
@@ -13,7 +14,11 @@ ADB="${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}"
 PKG=com.btgog.bagofdice.tests
 APK="${TMPDIR:-/tmp}/bag_of_dice_tests.apk"
 QUICK=0
-[ "${1:-}" = "--quick" ] && QUICK=1
+ONLY=""
+for arg in "$@"; do
+	[ "$arg" = "--quick" ] && QUICK=1
+	case "$arg" in --only=*) ONLY=",${arg#--only=}," ;; esac
+done
 
 # Always remove the test copy from the phone afterwards.
 cleanup() {
@@ -35,6 +40,9 @@ failed_names=()
 # run_test "Name" "res://tests/x.gd [args]" [minutes]
 run_test() {
 	local name="$1" spec="$2" limit=$(( ${3:-4} * 60 ))
+	if [ -n "$ONLY" ] && [[ "$ONLY" != *",$name,"* ]]; then
+		return
+	fi
 	printf "%-22s " "$name"
 	"$ADB" shell am force-stop $PKG
 	"$ADB" shell "echo '$spec' | run-as $PKG sh -c 'mkdir -p files && cat > files/next_test.txt; rm -f files/test_results.log'"

@@ -24,7 +24,11 @@ extends Node3D
 
 ## 0–1, set every frame from the shake detector.
 var shake_level: float = 0.0
-## Dice put back in the middle after getting outside the cup (shows as a jump), for tests.
+## A die's centre is kept at least this far inside the cup's walls (less than any die's
+## half-width, so dice resting against a wall are never moved).
+const WALL_GAP: float = 0.25
+
+## Dice that got right through a wall and had to be stepped back in, for tests.
 var rescues: int = 0
 
 var _dice: Array[Die] = []
@@ -113,14 +117,26 @@ func _physics_process(delta: float) -> void:
 		die.apply_torque_impulse(_random_unit_vector() * kick_speed * kick_spin * die.mass)
 
 
-## Caps a die's speed and puts it back in the middle if it escapes anyway.
+## Caps a die's speed, and if one is pushed into a wall (crowded dice can squeeze
+## each other through), steps it back just inside and bounces it off, rather than
+## moving it to the middle, which looked like a teleport.
 func _contain(die: Die) -> void:
 	if die.linear_velocity.length() > max_speed_in_cup:
 		die.linear_velocity = die.linear_velocity.limit_length(max_speed_in_cup)
-	if not _inside.grow(0.3).has_point(die.global_position):
-		rescues += 1
-		die.global_position = _inside.get_center()
-		die.linear_velocity = Vector3.ZERO
+	var p: Vector3 = die.global_position
+	var lo: Vector3 = _inside.position + Vector3.ONE * WALL_GAP
+	var hi: Vector3 = _inside.end - Vector3.ONE * WALL_GAP
+	var clamped: Vector3 = p.clamp(lo, hi)
+	if clamped == p:
+		return
+	if not _inside.grow(0.3).has_point(p):
+		rescues += 1  # right through a wall
+	var v: Vector3 = die.linear_velocity
+	for axis: int in 3:
+		if p[axis] != clamped[axis] and signf(v[axis]) == signf(p[axis] - clamped[axis]):
+			v[axis] = -v[axis] * 0.5
+	die.global_position = clamped
+	die.linear_velocity = v
 
 
 ## Closed box (floor, walls, lid) around `homes`. Walls are thick and overlap at the corners, so there are no gaps.
