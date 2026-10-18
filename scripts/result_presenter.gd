@@ -70,7 +70,7 @@ func present(dice: Array[Die], camera: Camera3D, top_px: float, bottom_px: float
 		var right: Vector3 = cam_basis.y.cross(to_camera).normalized()
 		var view: Basis = Basis(right, to_camera.cross(right), to_camera)
 		var target: Transform3D = Transform3D(
-				turn * _facing_basis(die.get_top_face_entry(), view), pos)
+				turn * _facing_basis(die.result_entry(), view), pos)
 
 		die.freeze = true
 		var from: Transform3D = die.global_transform

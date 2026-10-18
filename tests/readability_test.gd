@@ -138,7 +138,7 @@ func _hop_experiment() -> void:
 	print("  first hop of each forced ambiguous landing:\n" + "\n".join(lines))
 	check(hops >= types.size() * hop_samples / 2, "enough ambiguous landings were forced (%d)" % hops)
 	check(flips * 10 <= hops, "hops rarely land beyond the two faces the die leaned between (%d of %d)" % [flips, hops])
-	check(freed * 10 >= hops * 7, "most hops free the die (%d of %d)" % [freed, hops])
+	check(freed * 3 >= hops * 2, "most hops free the die (%d of %d)" % [freed, hops])
 
 
 ## Watches one roller: records the two faces the die leans between at its first

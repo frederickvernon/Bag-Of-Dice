@@ -30,7 +30,9 @@ const SWIPE_SPEED_RANGE: Vector2 = Vector2(400.0, 2500.0)
 const FLICK_WINDOW: float = 0.15
 const FLICK_MIN_DISTANCE: float = 60.0
 ## Sideways finger speed (pixels/s) that rattles held dice gently, and hardest.
-const RATTLE_SPEED_RANGE: Vector2 = Vector2(250.0, 2200.0)
+## Starting point for framing the table and drawer, relative to the scene's camera.
+const CAMERA_NEARER: Vector3 = Vector3(0.0, 1.0, 2.1)
+const RATTLE_SPEED_RANGE: Vector2 = Vector2(250.0, 1500.0)
 ## Engine time scale while rolling with Fast roll on.
 const FAST_ROLL_SPEED: float = 1.75
 const PICK_HINT: String = "Tap the dice to throw\nHold a die to lock it"
@@ -54,6 +56,9 @@ const PICK_HINT: String = "Tap the dice to throw\nHold a die to lock it"
 @onready var _menu_button: MenuIconButton = $UI/Root/MenuButton
 @onready var _settings_sheet: SettingsSheet = $UI/Root/SettingsSheet
 @onready var _tutorial: TutorialOverlay = $UI/Root/TutorialOverlay
+var _power: PowerSaver = PowerSaver.new()
+## The camera's place in the scene; _fit_camera() works from there.
+var _camera_home: Transform3D
 
 var _store: DiceSetStore = DiceSetStore.new()
 var _history: RollHistory = RollHistory.new()
@@ -80,6 +85,10 @@ var _drag_rattle: float = 0.0
 
 
 func _ready() -> void:
+	add_child(_power)
+	_camera_home = _camera.transform
+	get_viewport().size_changed.connect(_fit_camera)
+	_fit_camera.call_deferred()
 	_roll_button.pressed.connect(_on_roll_button_pressed)
 	_sets_button.pressed.connect(_open_drawer)
 	_history_button.pressed.connect(_open_history)
@@ -91,6 +100,9 @@ func _ready() -> void:
 	_shake.shake_finished.connect(_on_shake_finished)
 	_picker.selection_changed.connect(_on_pick_changed)
 	_roller.die_impact.connect(_sounds.play_impact)
+	_power.busy_check = _needs_full_speed
+	_roller.rethrow_started.connect(_on_rethrow_started)
+	_roller.bank_ready.connect(_on_bank_ready)
 	_drawer.set_chosen.connect(_on_set_chosen)
 	_drawer.edit_requested.connect(func(id: String) -> void: _editor.open(_store.get_set(id)))
 	_drawer.new_requested.connect(func() -> void: _editor.open({}))
@@ -112,6 +124,7 @@ func _ready() -> void:
 	_menu.history_pressed.connect(_open_history)
 	_menu.settings_pressed.connect(func() -> void: _settings_sheet.open(_settings))
 	_settings_sheet.changed.connect(_on_setting_changed)
+	_settings_sheet.rethrow_mode_changed.connect(set_global_rethrow_mode)
 	if OS.is_debug_build():
 		var overlay: RethrowDebugOverlay = RethrowDebugOverlay.new()
 		add_child(overlay)
@@ -141,6 +154,8 @@ func _ready() -> void:
 	_settings.load_settings()
 	_sounds.enabled = _settings.sound
 	_haptics.enabled = _settings.haptics
+	_editor.global_rethrow_mode = _settings.rethrow_mode
+	_roller.manual_rethrow = _settings.manual_rethrow
 	_apply_menu_button()
 	var start_id: String = _store.last_set_id
 	var skip_menu: bool = false
@@ -287,6 +302,8 @@ func _go_back() -> void:
 		_drawer.close()
 	elif _menu.visible:
 		get_tree().quit()
+	elif _roller.is_waiting_for_throw():
+		pass  # the roll isn't finished: these dice still need throwing
 	elif _state == State.PICKING or _state == State.ARMED:
 		_disarm()
 	else:
@@ -296,6 +313,8 @@ func _go_back() -> void:
 # Start menu
 
 func _show_menu() -> void:
+	if _roller.is_waiting_for_throw():
+		return  # finish the roll first: these dice still need throwing
 	if _state == State.ARMED or _state == State.PICKING:
 		_disarm()
 	_menu.set_continue_name(_current_set.get("name", ""))
@@ -352,6 +371,10 @@ func _on_setting_changed(key: String, on: bool) -> void:
 			_settings.menu_button = on
 			_settings.save()
 			_apply_menu_button()
+		"manual_rethrow":
+			_settings.manual_rethrow = on
+			_roller.manual_rethrow = on
+			_settings.save()
 
 
 ## Shows or hides the table's menu button; the result bar uses the space when hidden.
@@ -382,10 +405,16 @@ func _on_set_chosen(id: String) -> void:
 
 
 func _on_set_saved(set_data: Dictionary) -> void:
+	var before: Dictionary = _store.get_set(str(set_data.get("id", ""))).duplicate()
 	var stored: Dictionary = _store.upsert(set_data)
 	if stored.is_empty():
 		return
-	_locks.erase(stored["id"])  # its dice may have changed
+	# Its dice may have changed; changing only the re-throw choice keeps the locks.
+	var after: Dictionary = stored.duplicate()
+	before.erase("rethrow_mode")
+	after.erase("rethrow_mode")
+	if before != after:
+		_locks.erase(stored["id"])
 	_load_set(stored["id"])
 	_drawer.close()
 	_show_table()
@@ -434,6 +463,21 @@ func _put_on_table(set_data: Dictionary, id: String) -> void:
 				("Tap to %s" % action) if _settings.tap_to_roll else ("Press %s" % action.capitalize())]
 
 
+## The re-throw mode for the dice on the table: a saved set's own choice or the
+## global setting; quick rolls always use the global setting.
+func effective_rethrow_mode() -> String:
+	if _current_set_id.is_empty():
+		return RethrowMode.clean_global(_settings.rethrow_mode)
+	return RethrowMode.resolve(_current_set.get("rethrow_mode"), _settings.rethrow_mode)
+
+
+## Changes and saves the global re-throw mode.
+func set_global_rethrow_mode(mode: String) -> void:
+	_settings.rethrow_mode = RethrowMode.clean_global(mode)
+	_settings.save()
+	_editor.global_rethrow_mode = _settings.rethrow_mode
+
+
 ## Stop picking / listening for a shake and put the dice back on the table.
 func _disarm() -> void:
 	_put_on_table(_current_set, _current_set_id)
@@ -480,6 +524,11 @@ func _start_roll(power: float = 0.5) -> void:
 	var from_hand: bool = _state == State.ARMED
 	_presenter.cancel()
 	_hand.release()
+	if _roller.is_waiting_for_throw():
+		_roller.throw_bank(power)
+		_set_state(State.ROLLING)
+		return
+	_roller.rethrow_mode = effective_rethrow_mode()
 	_roller.roll(power, from_hand)
 	_set_state(State.ROLLING)
 
@@ -490,7 +539,7 @@ func _on_roll_finished(results: Array[Dictionary]) -> void:
 		return
 	var set_name: String = _current_set.get("name", "")
 	print("Rolled %s: %s" % [set_name, RollHistory.format_dice(results, false)])
-	_history.add(RollHistory.make_entry(_current_set_id, set_name, results))
+	_history.add(RollHistory.make_entry(_current_set_id, set_name, results, -1, _roller.rethrow_mode))
 	# Disarm until Roll is pressed again.
 	_set_state(State.IDLE)
 	_result_label.text = RollHistory.format_dice(results, true)
@@ -508,6 +557,57 @@ func _on_roll_finished(results: Array[Dictionary]) -> void:
 
 
 ## Lifts the dice below the result bar, one frame late so the bar has resized to the new text.
+## Frames the table and its drawer between the result bar and the buttons: starts a
+## little nearer and lower than the scene's camera, then backs away along its view
+## until the far rim and the drawer's back both fit (wider phones need it further back).
+func _fit_camera() -> void:
+	if not is_inside_tree():
+		return
+	var table: Table = $Table
+	var top: float = _result_label.get_global_rect().end.y + 8.0
+	var bottom: float = _roll_button.get_global_rect().position.y - 8.0
+	var rim: float = table.rim_width
+	var x: float = table.size.x * 0.5 + rim
+	var corners: Array[Vector3] = [
+		Vector3(-x, table.rim_height, -table.size.y * 0.5 - rim), Vector3(x, table.rim_height, -table.size.y * 0.5 - rim),
+		Vector3(-x, table.rim_height, table.drawer_back() + rim), Vector3(x, table.rim_height, table.drawer_back() + rim),
+	]
+	_camera.transform = _camera_home
+	_camera.position += CAMERA_NEARER
+	var back: Vector3 = _camera.global_basis.z.normalized()
+	for step: int in 60:
+		var fits: bool = true
+		for c: Vector3 in corners:
+			var p: Vector2 = _camera.unproject_position(table.to_global(c))
+			fits = fits and p.y >= top and p.y <= bottom
+		if fits:
+			break
+		_camera.global_position += back * 0.25
+
+
+## Full speed while dice are thrown, held (shaking needs every accelerometer
+## reading) or practising, and while a tip is animating; otherwise the power
+## saver may drop to low power after a quiet spell.
+func _needs_full_speed() -> bool:
+	return _warming or _roller.is_rolling() or _state == State.ARMED or _state == State.ROLLING \
+			or _tutorial.visible
+
+
+## Re-roll by hand: the banked dice come back to the player's hand to throw.
+func _on_bank_ready(_dice: Array[Die]) -> void:
+	if _warming:
+		_roller.throw_bank()
+		return
+	_set_state(State.ARMED)
+
+
+## A short note while dice are fully re-thrown, so a die jumping or flying back doesn't look like a bug.
+func _on_rethrow_started(count: int) -> void:
+	if _warming or _state != State.ROLLING:
+		return
+	_result_label.text = "Re-rolling 1 die" if count == 1 else "Re-rolling %d dice" % count
+
+
 func _present_results() -> void:
 	await get_tree().process_frame
 	if _state != State.IDLE or _roller.is_rolling():
@@ -543,6 +643,7 @@ func _update_tutorial() -> void:
 
 func _set_state(new_state: State) -> void:
 	_state = new_state
+	_power.wake()  # full physics rate before any dice move
 	# Fast roll keeps the same physics steps, just more per frame, so results are unaffected.
 	Engine.time_scale = FAST_ROLL_SPEED if new_state == State.ROLLING and _settings.fast_roll else 1.0
 	_presenter.duration = 0.3 if _settings.fast_roll else 0.6
@@ -563,12 +664,18 @@ func _set_state(new_state: State) -> void:
 			_picker.begin(_roller, _camera, _locks.get(_current_set_id, {}))
 		State.ARMED:
 			_presenter.cancel()
-			_hand.gather(_roller.get_active_dice(), _roller.hand_positions())
+			# Re-roll by hand holds only the banked dice; the rest of the roll waits on the table.
+			var rerolling: bool = _roller.is_waiting_for_throw()
+			var held: Array[Die] = _roller.get_bank() if rerolling else _roller.get_active_dice()
+			_hand.gather(held, _roller.hand_positions(held.size()))
 			_roll_button.text = "Throw"
 			_roll_button.disabled = false
-			_sets_button.disabled = false
-			_history_button.disabled = false
+			_sets_button.disabled = rerolling
+			_history_button.disabled = rerolling
 			_result_label.text = ARMED_HINT_TAP if _settings.tap_to_roll else ARMED_HINT
+			if rerolling:
+				_result_label.text = "Re-roll %s: %s" % ["1 die" if held.size() == 1 else "%d dice" % held.size(),
+						"shake, flick or tap to throw" if _settings.tap_to_roll else "shake or press Throw"]
 		State.ROLLING:
 			_roll_button.text = "Rolling…"
 			_roll_button.disabled = true

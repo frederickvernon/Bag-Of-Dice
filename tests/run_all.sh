@@ -1,8 +1,8 @@
 #!/bin/bash
 # Runs every test in this folder and prints a summary.
 #
-#   tests/run_all.sh           all tests (the fairness test takes about a minute)
-#   tests/run_all.sh --quick   everything except the fairness test
+#   tests/run_all.sh           all tests (the fairness runs take about 4 minutes)
+#   tests/run_all.sh --quick   everything except the fairness runs
 #
 # App tests use throwaway data files (test_*.json in the app's user folder),
 # never your real sets, history or settings. Set GODOT to use a different
@@ -60,10 +60,21 @@ run_test "Sound switch"      -s res://tests/sound_switch_test.gd -- "${DATA[@]}"
 run_test "Settings & extras" -s res://tests/settings_extras_test.gd -- "${DATA[@]}"
 run_test "Tap to roll"       -s res://tests/tap_to_roll_test.gd -- "${DATA[@]}"
 run_test "Tutorial"          -s res://tests/tutorial_test.gd -- "${DATA[@]}"
+run_test "Re-throw modes"    -s res://tests/rethrow_mode_test.gd -- "${DATA[@]}"
+run_test "Re-throw behaviour" -s res://tests/rethrow_behaviour_test.gd --fixed-fps 120 -- "${DATA[@]}"
+run_test "Re-throw screens"  -s res://tests/rethrow_app_test.gd -- "${DATA[@]}"
+run_test "Core rules"        -s res://tests/core_rules_test.gd --fixed-fps 120 -- "${DATA[@]}"
+run_test "Sound & vibration" -s res://tests/feedback_test.gd -- "${DATA[@]}"
+run_test "App flows"         -s res://tests/app_flow_test.gd -- "${DATA[@]}"
 run_test "Drag scroll"       -s res://tests/drag_scroll_test.gd -- "${DATA[@]}"
 run_test "Readability"       -s res://tests/readability_test.gd --fixed-fps 120 -- "${DATA[@]}"
 if [ $QUICK -eq 0 ]; then
 	run_test "Fairness"      res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=2000 "${DATA[@]}"
+	# Once per re-throw mode, 4 dice per table and some forced stacks so re-throws really happen.
+	for mode in live count clear; do
+		run_test "Fairness: $mode" res://tests/fairness_test.tscn --fixed-fps 120 -- --throws=500 --dice=4 \
+			--force-stack=0.3 --mode=$mode "${DATA[@]}"
+	done
 fi
 
 rm -f "$HOME/Library/Application Support/Godot/app_userdata/Bag Of Dice/test_results.log"

@@ -79,6 +79,12 @@ run_test "Sound switch"      "res://tests/sound_switch_test.gd"
 run_test "Settings & extras" "res://tests/settings_extras_test.gd"
 run_test "Tap to roll"       "res://tests/tap_to_roll_test.gd"
 run_test "Tutorial"          "res://tests/tutorial_test.gd"
+run_test "Re-throw modes"    "res://tests/rethrow_mode_test.gd"
+run_test "Re-throw behaviour" "res://tests/rethrow_behaviour_test.gd --trials=20" 8
+run_test "Re-throw screens"  "res://tests/rethrow_app_test.gd"
+run_test "Core rules"        "res://tests/core_rules_test.gd"
+run_test "Sound & vibration" "res://tests/feedback_test.gd"
+run_test "App flows"         "res://tests/app_flow_test.gd" 5
 run_test "Drag scroll"       "res://tests/drag_scroll_test.gd"
 run_test "Readability"       "res://tests/readability_test.gd --hop-samples=12" 6
 if [ $QUICK -eq 0 ]; then

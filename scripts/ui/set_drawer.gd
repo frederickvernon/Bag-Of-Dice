@@ -97,6 +97,9 @@ func _make_card(set_data: Dictionary, is_current: bool) -> Button:
 	summary.text = DiceSetStore.summary(set_data)
 	if set_data.get("pick_dice", false):
 		summary.text += "  ·  pick dice"
+	var mode: String = RethrowMode.clean_set(set_data.get("rethrow_mode"))
+	if mode != RethrowMode.TABLE_DEFAULT:
+		summary.text += "  ·  " + (RethrowMode.NAMES[mode] as String).to_lower()
 	summary.theme_type_variation = "MutedLabel"
 	summary.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL

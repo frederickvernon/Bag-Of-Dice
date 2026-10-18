@@ -24,7 +24,8 @@ func run() -> void:
 		_main.call("_on_roll_button_pressed")  # Throw
 		var results: Array = await _roller.roll_finished
 		var on_table: bool = true
-		for d: Die in _roller.get_active_dice():
+		# Dice lifted mid-roll (Clear the table) were read on the table first.
+		for d: Die in _roller.in_play_dice():
 			var p: Vector3 = _roller.to_local(d.global_position)
 			if absf(p.x) > 4.5 or absf(p.z) > 7.5 or p.y > 2.0:
 				on_table = false

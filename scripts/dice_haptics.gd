@@ -19,6 +19,9 @@ const USAGE_MEDIA: int = 19
 ## Min seconds between buzzes, so many dice landing together don't become one long rumble.
 @export var min_gap: float = 0.06
 
+## Length of the latest buzz (ms), for tests.
+var last_duration_ms: int = 0
+
 var _last_buzz: float = -1.0
 # Android objects for media vibrations; null where unavailable (desktop, Android < 13).
 var _vibrator: Variant = null
@@ -51,6 +54,7 @@ func play_impact(kind: String, speed: float) -> void:
 	_last_buzz = now
 	var strength: float = clampf((speed - min_impact_speed) / (max_impact_speed - min_impact_speed), 0.0, 1.0)
 	var ms: int = int(lerpf(min_duration_ms, max_duration_ms, strength))
+	last_duration_ms = ms
 	var amplitude: float = lerpf(0.25, 1.0, strength)
 	if _vibrator != null:
 		_vibrator.vibrate(_effect_class.createOneShot(ms, int(amplitude * 255.0)), _media_attrs)

@@ -42,14 +42,23 @@ func run() -> void:
 		_travel.clear()
 		for d: Die in _roller.get_active_dice():
 			_travel[d] = 0.0
+		var hand: DiceHand = _main.get_node("DiceHand")
+		hand.rescues = 0
+		var top_speed: float = 0.0
 		_shaking = true
-		await frames(80)
+		for f: int in 80:
+			await process_frame
+			for d: Die in _roller.get_active_dice():
+				top_speed = maxf(top_speed, d.linear_velocity.length())
 		if attempt == 0:
 			snap("shaking")
 		var least: float = INF
 		for d: Die in _travel:
 			least = minf(least, _travel[d])
 		check(least > 1.0, "attempt %d: every die moved while shaking (least %.1f units)" % [attempt, least])
+		# Faster than this, dice move so far between frames that they seem to jump.
+		check(top_speed <= hand.max_speed_in_cup * 1.5 and hand.rescues == 0,
+				"attempt %d: no die goes fast enough to look like it jumps (top %.1f), none had to be put back" % [attempt, top_speed])
 
 		var inside: AABB = (_main.get_node("DiceHand").get("_inside") as AABB).grow(0.4)
 		_shaking = false
@@ -65,7 +74,8 @@ func run() -> void:
 
 		var results: Array = await _roller.roll_finished  # stopping the shake throws
 		var on_table: bool = true
-		for d: Die in _roller.get_active_dice():
+		# Dice lifted mid-roll (Clear the table) were read on the table first.
+		for d: Die in _roller.in_play_dice():
 			var p: Vector3 = _roller.to_local(d.global_position)
 			if absf(p.x) > 4.5 or absf(p.z) > 7.5 or p.y > 2.0:
 				on_table = false

@@ -6,6 +6,7 @@ extends RefCounted
 ##   AccentButton — the main action (Roll, Save)
 ##   DangerButton — destructive actions (Delete)
 ##   CardButton   — a tappable card in a list
+##   ChoiceButton — one of a set of options; the chosen one has an accent outline
 ##   HeaderLabel / MutedLabel — large titles / secondary text
 
 const ACCENT: Color = Color(0.85, 0.55, 0.15)
@@ -32,6 +33,13 @@ static func build() -> Theme:
 	_button(t, "DangerButton", Color(0.32, 0.12, 0.12), Color(1.0, 0.82, 0.82))
 	t.set_type_variation("CardButton", "Button")
 	_button(t, "CardButton", RAISED, TEXT, 20, 18)
+	t.set_type_variation("ChoiceButton", "Button")
+	_button(t, "ChoiceButton", RAISED, TEXT)
+	var chosen: StyleBoxFlat = _box(RAISED, RADIUS, 20.0, 12.0)
+	chosen.border_color = ACCENT
+	chosen.set_border_width_all(3)
+	t.set_stylebox("pressed", "ChoiceButton", chosen)
+	t.set_stylebox("hover_pressed", "ChoiceButton", chosen)
 
 	t.set_color("font_color", "Label", TEXT)
 	t.set_type_variation("HeaderLabel", "Label")

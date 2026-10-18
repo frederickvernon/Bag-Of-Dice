@@ -10,6 +10,11 @@ extends Node3D
 ##   --types=d6,d20 types to test (default: all)
 ##   --seed=N       fixed seed, to reproduce a run
 ##   --power=P      throw power 0–1 (default: random per throw)
+##   --mode=M       re-throw mode: live, count or clear (default clear)
+##   --dice=N       dice of the type on each table (default 1). With more than one,
+##                  dice land on each other and get re-thrown, so the mode matters
+##   --force-stack=P  chance (0–1) per roll of forcing one die onto another (debug builds),
+##                  to make sure re-throws happen
 
 const ARENA_SPACING: float = 25.0
 
@@ -17,6 +22,9 @@ var _throws_per_type: int = 3000
 var _arenas_per_type: int = 25
 var _types: Array[String] = []
 var _power: float = -1.0  # < 0 means random per throw
+var _mode: String = RethrowMode.CLEAR
+var _dice_per_table: int = 1
+var _force_stack: float = 0.0
 
 ## type -> { "launched": int, "done": int, "counts": Dictionary (value -> int),
 ##           "tens": Dictionary, "units": Dictionary, "rollers": Array }
@@ -42,15 +50,22 @@ func _ready() -> void:
 			_power = value.to_float()
 		elif arg.begins_with("--seed="):
 			seed(value.to_int())
+		elif arg.begins_with("--mode="):
+			_mode = RethrowMode.clean_global(value)
+		elif arg.begins_with("--dice="):
+			_dice_per_table = maxi(1, value.to_int())
+		elif arg.begins_with("--force-stack="):
+			_force_stack = value.to_float()
 
-	print("Fairness test: %d throws each of %s, %d tables per type, power %s" \
+	print("Fairness test: %d throws each of %s, %d tables per type, power %s, mode %s, %d dice per table, forced stacks %.0f%%" \
 			% [_throws_per_type, ", ".join(_types), _arenas_per_type,
-			"random" if _power < 0.0 else str(_power)])
+			"random" if _power < 0.0 else str(_power), _mode, _dice_per_table, _force_stack * 100.0])
 	_start_ms = Time.get_ticks_msec()
 
 	for t_index: int in _types.size():
 		var type: String = _types[t_index]
-		_stats[type] = { "launched": 0, "done": 0, "counts": {}, "tens": {}, "units": {}, "rollers": [] }
+		_stats[type] = { "launched": 0, "done": 0, "results": 0, "locked": 0, "counts": {}, "tens": {}, "units": {},
+				"rollers": [] }
 		for a: int in _arenas_per_type:
 			var offset: Vector3 = Vector3(a * ARENA_SPACING, 0.0, t_index * ARENA_SPACING)
 			var table: Table = Table.new()
@@ -60,7 +75,11 @@ func _ready() -> void:
 			roller.position = offset
 			roller.log_events = false
 			add_child(roller)
-			roller.set_dice([{ "type": type }])
+			roller.rethrow_mode = _mode
+			var specs: Array[Dictionary] = []
+			for i: int in _dice_per_table:
+				specs.append({ "type": type })
+			roller.set_dice(specs)
 			roller.roll_finished.connect(_on_roll_finished.bind(type, roller))
 			_stats[type]["rollers"].append(roller)
 			_launch(type, roller)
@@ -70,16 +89,20 @@ func _launch(type: String, roller: DiceRoller) -> void:
 	var s: Dictionary = _stats[type]
 	if s["launched"] < _throws_per_type:
 		s["launched"] += 1
+		roller.debug_force = "stack" if randf() < _force_stack else ""
 		roller.roll(randf() if _power < 0.0 else _power)
 
 
 func _on_roll_finished(results: Array[Dictionary], type: String, roller: DiceRoller) -> void:
 	var s: Dictionary = _stats[type]
-	var r: Dictionary = results[0]
-	_bump(s["counts"], r["value"])
-	if type == "d100":
-		_bump(s["tens"], r["parts"][0])
-		_bump(s["units"], r["parts"][1])
+	for r: Dictionary in results:
+		_bump(s["counts"], r["value"])
+		if type == "d100":
+			_bump(s["tens"], r["parts"][0])
+			_bump(s["units"], r["parts"][1])
+		s["results"] += 1
+		if r.get("locked", false):
+			s["locked"] += 1
 	s["done"] += 1
 	_launch(type, roller)
 	_report_progress()
@@ -109,14 +132,15 @@ func _print_report() -> bool:
 		for roller: DiceRoller in s["rollers"]:
 			nudges += roller.nudge_count
 			rethrows += roller.rethrow_count
-		print("\n%s — %d throws, %d nudges, %d re-throws" % [type, s["done"], nudges, rethrows])
+		preload("res://tests/test_log.gd").line("%s (%s) — %d throws, %d dice read, %d hops, %d re-throws, %d results locked before a re-throw" % [
+				type, _mode, s["done"], s["results"], nudges, rethrows, s["locked"]])
 		if type == "d100":
 			# 100 outcomes need far more throws; test each d10 instead.
-			all_ok = _print_faces("tens die", s["tens"], _values(0, 90, 10), s["done"]) and all_ok
-			all_ok = _print_faces("units die", s["units"], _values(0, 9, 1), s["done"]) and all_ok
+			all_ok = _print_faces("tens die", s["tens"], _values(0, 90, 10), s["results"]) and all_ok
+			all_ok = _print_faces("units die", s["units"], _values(0, 9, 1), s["results"]) and all_ok
 		else:
 			var sides: int = type.substr(1).to_int()
-			all_ok = _print_faces(type, s["counts"], _values(1, sides, 1), s["done"]) and all_ok
+			all_ok = _print_faces(type, s["counts"], _values(1, sides, 1), s["results"]) and all_ok
 	preload("res://tests/test_log.gd").line("Overall: %s" % ("PASS — no die looks biased" if all_ok else "CHECK — at least one die looks biased (see above)"))
 	print("(With 7 types, one borderline result now and then is normal chance; re-run with more throws to confirm.)")
 	return all_ok

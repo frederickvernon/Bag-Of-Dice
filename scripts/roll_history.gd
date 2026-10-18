@@ -69,19 +69,29 @@ func save() -> bool:
 
 
 ## Builds an entry from DiceRoller results.
+## `rethrow_mode`: the mode the roll actually used (never "default").
 static func make_entry(set_id: String, set_name: String, results: Array[Dictionary],
-		unix_time: int = -1) -> Dictionary:
+		unix_time: int = -1, rethrow_mode: String = "") -> Dictionary:
 	var dice: Array[Dictionary] = []
 	var total: int = 0
 	for r: Dictionary in results:
-		dice.append({
+		var die: Dictionary = {
 			"type": r["type"], "value": r["value"], "color": r["color"],
 			"label": r.get("label", ""), "parts": r.get("parts", [r["value"]]).duplicate(),
-		})
+		}
+		# Re-throw details: result locked before a re-throw, and full re-throws needed.
+		if r.has("locked"):
+			die["locked"] = r["locked"] == true
+		if r.has("rethrows"):
+			die["rethrows"] = maxi(0, int(r["rethrows"]))
+		dice.append(die)
 		total += int(r["value"])
 	if unix_time < 0:
 		unix_time = int(Time.get_unix_time_from_system())
-	return { "time": unix_time, "set_id": set_id, "set_name": set_name, "total": total, "dice": dice }
+	var entry: Dictionary = { "time": unix_time, "set_id": set_id, "set_name": set_name, "total": total, "dice": dice }
+	if RethrowMode.MODES.has(rethrow_mode):
+		entry["rethrow_mode"] = rethrow_mode
+	return entry
 
 
 ## Returns a clean copy, or {} if unusable. Out-of-range die values are
@@ -112,20 +122,30 @@ static func sanitize_entry(raw: Variant) -> Dictionary:
 				parts.append(int(p))
 		if parts.is_empty():
 			parts.append(value)
-		dice.append({
+		var die: Dictionary = {
 			"type": type, "value": value, "color": color,
 			"label": str(d.get("label", "")).left(DiceSetStore.MAX_LABEL_LENGTH), "parts": parts,
-		})
+		}
+		# Older entries have no re-throw details.
+		if d.has("locked"):
+			die["locked"] = d["locked"] == true
+		if d.has("rethrows"):
+			die["rethrows"] = maxi(0, int(d["rethrows"])) if (d["rethrows"] is int or d["rethrows"] is float) else 0
+		dice.append(die)
 		total += value
 	if dice.is_empty():
 		return {}
-	return {
+	var entry: Dictionary = {
 		"time": maxi(0, int(raw.get("time", 0))),
 		"set_id": str(raw.get("set_id", "")),
 		"set_name": str(raw.get("set_name", "")).left(DiceSetStore.MAX_NAME_LENGTH),
 		"total": total,
 		"dice": dice,
 	}
+	# Older entries have no mode; an unknown one is dropped.
+	if RethrowMode.MODES.has(str(raw.get("rethrow_mode", ""))):
+		entry["rethrow_mode"] = str(raw["rethrow_mode"])
+	return entry
 
 
 ## Groups consecutive dice of the same type and label ("d6: 4  2  5").

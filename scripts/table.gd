@@ -3,6 +3,9 @@ extends StaticBody3D
 ## Flat table with invisible walls and ceiling, built in code. The play area is
 ## size.x by size.y, centred on the origin, top at y = 0. The visible rim is low;
 ## the collision walls are much taller.
+## Along the near edge (+z), past a thin divider rail, is the drawer: a shallow felt
+## tray where dice wait while they're out of play (sitting out, or already counted).
+## Dice are placed there by code; the play area's invisible wall keeps thrown dice out.
 
 ## Keep in step with DiceRoller.table_size.
 @export var size: Vector2 = Vector2(9.0, 15.0)
@@ -12,6 +15,11 @@ extends StaticBody3D
 @export var rim_color: Color = Color(0.36, 0.22, 0.12)
 @export var rim_width: float = 0.5
 @export var rim_height: float = 0.6
+## Drawer: inside depth, the divider rail between it and the play area, and how far
+## its felt sits below the table's.
+@export var drawer_depth: float = 2.7
+@export var divider_width: float = 0.22
+@export var drawer_drop: float = 0.06
 
 
 func _ready() -> void:
@@ -35,18 +43,44 @@ func _ready() -> void:
 	_add_collision(Vector3(size.x + 2.0 * t, t, size.y + 2.0 * t), Vector3(0.0, h + t * 0.5, 0.0))
 
 	# Visible felt, slightly larger than the play area so it runs under the rim.
-	_add_mesh(Vector3(size.x + 2.0 * rim_width, 0.2, size.y + 2.0 * rim_width),
-			Vector3(0.0, -0.1, 0.0), _felt_material())
-	# Wooden rim inside the invisible walls, grain running along each piece.
 	var rw: float = rim_width
 	var rh: float = rim_height
+	var near: float = size.y * 0.5
+	_add_mesh(Vector3(size.x + 2.0 * rw, 0.2, size.y + rw),
+			Vector3(0.0, -0.1, -rw * 0.5), _felt_material())
+	# The drawer's felt: a touch darker and a little lower, running under the divider.
+	var drawer_felt: StandardMaterial3D = _felt_material()
+	drawer_felt.albedo_color = Color(0.92, 0.92, 0.92)
+	var drawer_len: float = divider_width + drawer_depth
+	_add_mesh(Vector3(size.x, 0.2, drawer_len), Vector3(0.0, -drawer_drop - 0.1, near + drawer_len * 0.5), drawer_felt)
+	# Wooden rim inside the invisible walls, grain running along each piece. The sides run
+	# unbroken from the far end past the drawer, so table and drawer read as one tray.
 	var outer_x: float = size.x + 2.0 * rw
+	var back: float = drawer_back()
 	var wood_along_z: StandardMaterial3D = _wood_material(Vector3(1.5, 1.5, 0.12))
 	var wood_along_x: StandardMaterial3D = _wood_material(Vector3(0.12, 1.5, 1.5))
-	_add_mesh(Vector3(rw, rh, size.y), Vector3(-(size.x + rw) * 0.5, rh * 0.5, 0.0), wood_along_z)
-	_add_mesh(Vector3(rw, rh, size.y), Vector3((size.x + rw) * 0.5, rh * 0.5, 0.0), wood_along_z)
+	var side_len: float = back + near
+	for side: float in [-1.0, 1.0]:
+		_add_mesh(Vector3(rw, rh, side_len), Vector3(side * (size.x + rw) * 0.5, rh * 0.5, (back - near) * 0.5), wood_along_z)
 	_add_mesh(Vector3(outer_x, rh, rw), Vector3(0.0, rh * 0.5, -(size.y + rw) * 0.5), wood_along_x)
-	_add_mesh(Vector3(outer_x, rh, rw), Vector3(0.0, rh * 0.5, (size.y + rw) * 0.5), wood_along_x)
+	_add_mesh(Vector3(outer_x, rh, rw), Vector3(0.0, rh * 0.5, back + rw * 0.5), wood_along_x)
+	# The divider: a thin, low rail, like a cutlery-tray partition.
+	_add_mesh(Vector3(size.x, rh * 0.45, divider_width), Vector3(0.0, rh * 0.225, near + divider_width * 0.5), wood_along_x)
+
+
+## Local z where the drawer's felt starts (just past the divider).
+func drawer_front() -> float:
+	return size.y * 0.5 + divider_width
+
+
+## Local z of the drawer's back edge (the inside of the outer rim).
+func drawer_back() -> float:
+	return drawer_front() + drawer_depth
+
+
+## Local height of the drawer's felt.
+func drawer_floor() -> float:
+	return -drawer_drop
 
 
 ## Green felt with a subtle mottled texture so the surface doesn't look flat.

@@ -39,6 +39,18 @@ var group_index: int = 0
 var nudges: int = 0
 ## Corners of the collision shape (local space). Set by DiceFactory.
 var corners: PackedVector3Array = PackedVector3Array()
+## This roll's result once it's locked (read before a re-throw in Count where they
+## land or Clear the table): a faces entry. Empty while the die is still read live.
+## A locked die keeps this result however it's knocked afterwards.
+var locked_entry: Dictionary = {}
+## The result once the roll has finished, so it can still be shown after the die
+## has been lifted and turned to face the player.
+var final_entry: Dictionary = {}
+## Full re-throws this roll, and how many of them were for landing on other dice. Managed by DiceRoller.
+var rethrows: int = 0
+var stack_rethrows: int = 0
+## 0 normal, 1 counted (slightly dim), 2 sitting out (greyed).
+var _shade: int = 0
 
 var _limit_degrees: float = -1.0
 ## Eases the Body mesh flat; the physics body itself never moves.
@@ -86,6 +98,8 @@ func _on_body_entered(other: Node) -> void:
 func throw(start_position: Vector3, start_rotation: Basis, lin_vel: Vector3, ang_vel: Vector3) -> void:
 	# Teleport while still frozen (if it was being presented), then hand back to physics.
 	reset_visual()
+	final_entry = {}
+	set_solid(true)
 	global_transform = Transform3D(start_rotation, start_position)
 	freeze = false
 	sleeping = false
@@ -116,6 +130,23 @@ func get_moving_time() -> float:
 
 func is_resting() -> bool:
 	return _rest_timer >= rest_time_required
+
+
+## The result to show and count: the locked one if there is one, the final one once
+## the roll is over, otherwise the face up now.
+func result_entry() -> Dictionary:
+	if not locked_entry.is_empty():
+		return locked_entry
+	if not final_entry.is_empty():
+		return final_entry
+	return get_top_face_entry()
+
+
+## Whether other dice (and the table) collide with this one. Off for a die
+## that's been lifted off the table mid-roll, so it can't get in the way.
+func set_solid(solid: bool) -> void:
+	collision_layer = 1 if solid else 0
+	collision_mask = 1 if solid else 0
 
 
 ## Returns the value facing up, or -1 if the die is tilted too far to read (cocked).
@@ -188,6 +219,21 @@ func rest_height(basis: Basis) -> float:
 
 ## Greys out the die (body and numbers) to show it's sitting out.
 func set_dimmed(dimmed: bool) -> void:
+	_set_shade(2 if dimmed else 0)
+
+
+## Slightly dims a die whose result is already counted while another is re-thrown.
+func set_counted(counted: bool) -> void:
+	if _shade != 2:
+		_set_shade(1 if counted else 0)
+
+
+func is_counted_shown() -> bool:
+	return _shade == 1
+
+
+func _set_shade(shade: int) -> void:
+	_shade = shade
 	var mesh: Mesh = (get_node("Body") as MeshInstance3D).mesh
 	if not has_meta("base_colors"):
 		var colors: Array[Color] = []
@@ -198,8 +244,12 @@ func set_dimmed(dimmed: bool) -> void:
 	var body: Color = base[0]
 	var grey: Color = Color.from_hsv(body.h, body.s * 0.25, body.v * 0.4)
 	for i: int in mesh.get_surface_count():
-		var target: Color = grey if i == 0 else (base[i] as Color).lerp(grey, 0.6)
-		(mesh.surface_get_material(i) as StandardMaterial3D).albedo_color = target if dimmed else base[i]
+		var target: Color = base[i]
+		if shade == 2:
+			target = grey if i == 0 else (base[i] as Color).lerp(grey, 0.6)
+		elif shade == 1 and i == 0:
+			target = (base[i] as Color).darkened(0.3)
+		(mesh.surface_get_material(i) as StandardMaterial3D).albedo_color = target
 
 
 ## Eases the visible die flat onto the face it was read from, tipping over its

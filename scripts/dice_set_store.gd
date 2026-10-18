@@ -8,12 +8,14 @@ extends RefCounted
 ##   "version": 1,
 ##   "last_set_id": "…",
 ##   "sets": [
-##     { "id": "…", "name": "Fireball", "pick_dice": false,
+##     { "id": "…", "name": "Fireball", "pick_dice": false, "rethrow_mode": "default",
 ##       "dice": [ { "type": "d6", "style": "pips", "color": "#e8742a", "label": "" }, … ] }
 ##   ]
 ## }
 ## style: face look (see DiceFactory.STYLES); missing or unknown means the default.
 ## pick_dice: the player picks which of the set's dice to throw each time.
+## rethrow_mode: a RethrowMode id, or "default" to follow the global setting.
+## Missing or unknown means "default"; it never makes a set invalid.
 ##
 ## Malformed data from disk is dropped, not fatal. An unreadable file is kept
 ## aside as dice_sets.corrupt.json, not overwritten (see JsonFile).
@@ -134,7 +136,8 @@ static func sanitize_set(raw: Variant) -> Dictionary:
 			dice.append({ "type": type, "style": style, "color": color, "label": label })
 	if dice.is_empty():
 		return {}
-	return { "id": id, "name": name, "pick_dice": raw.get("pick_dice", false) == true, "dice": dice }
+	return { "id": id, "name": name, "pick_dice": raw.get("pick_dice", false) == true,
+			"rethrow_mode": RethrowMode.clean_set(raw.get("rethrow_mode")), "dice": dice }
 
 
 static func new_id() -> String:
@@ -187,7 +190,8 @@ static func example_sets() -> Array[Dictionary]:
 
 
 static func _example(name: String, dice: Array[Dictionary], pick_dice: bool) -> Dictionary:
-	return { "id": new_id(), "name": name, "pick_dice": pick_dice, "dice": dice }
+	return { "id": new_id(), "name": name, "pick_dice": pick_dice,
+			"rethrow_mode": RethrowMode.TABLE_DEFAULT, "dice": dice }
 
 
 static func _repeat(type: String, color: String, count: int, label: String = "") -> Array[Dictionary]:

@@ -1,6 +1,7 @@
 extends "res://tests/app_test.gd"
 ## Re-rolling while the last result shows (mid-lift and after) with the RPG
-## set: every die must land back on the table.
+## set: every die must land back on the table (or, in Clear the table, be lifted
+## off it after being read there).
 
 var _main: Node
 var _roller: DiceRoller
@@ -23,7 +24,8 @@ func run() -> void:
 		_main.call("_start_roll")
 		await _roller.roll_finished
 		var off_table: Array[String] = []
-		for d: Die in _roller.get_active_dice():
+		# Dice lifted mid-roll (Clear the table) were read on the table first.
+		for d: Die in _roller.in_play_dice():
 			var p: Vector3 = _roller.to_local(d.global_position)
 			if absf(p.x) > _roller.table_size.x * 0.5 or absf(p.z) > _roller.table_size.y * 0.5 or p.y > 2.0 or p.y < -0.5:
 				off_table.append(str(d.name))

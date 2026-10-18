@@ -11,16 +11,21 @@ extends Node3D
 @export var cup_height: float = 3.5
 @export var cup_margin: float = 0.9
 ## Kick speed (units/s) at the hardest shake, and kicks per die per second.
-@export var shake_kick: float = 7.0
-@export var shake_kicks_per_second: float = 14.0
-## Speed cap (units/s) in the cup, so repeated kicks can't punch a die through the walls.
-@export var max_speed_in_cup: float = 9.0
+@export var shake_kick: float = 11.0
+@export var shake_kicks_per_second: float = 22.0
+## Speed cap (units/s) in the cup, kicks included. Faster dice move so far between frames
+## that they seem to jump (about 0.2 units a frame at 60 fps at this cap).
+@export var max_speed_in_cup: float = 11.0
+## Spin added with each kick, as a fraction of the kick speed, so dice tumble rather than slide.
+@export var kick_spin: float = 0.16
 ## Small occasional nudges while held still, so the dice don't look frozen.
 @export var idle_kick: float = 0.8
 @export var idle_kicks_per_second: float = 0.6
 
 ## 0–1, set every frame from the shake detector.
 var shake_level: float = 0.0
+## Dice put back in the middle after getting outside the cup (shows as a jump), for tests.
+var rescues: int = 0
 
 var _dice: Array[Die] = []
 var _cup: StaticBody3D
@@ -36,7 +41,7 @@ func _ready() -> void:
 	_cup.name = "Cup"
 	var phys: PhysicsMaterial = PhysicsMaterial.new()
 	phys.friction = 0.4
-	phys.bounce = 0.35
+	phys.bounce = 0.5
 	_cup.physics_material_override = phys
 	add_child(_cup)
 	_set_cup_enabled(false)
@@ -103,8 +108,9 @@ func _physics_process(delta: float) -> void:
 		# Mostly upward so dice hop and tumble, plus a random sideways part to mix them.
 		var dir: Vector3 = (_random_unit_vector() + Vector3.UP * 0.8).normalized()
 		die.sleeping = false
-		die.apply_central_impulse(dir * kick_speed * die.mass * randf_range(0.6, 1.0))
-		die.apply_torque_impulse(_random_unit_vector() * kick_speed * 0.08 * die.mass)
+		# Set the speed directly, so a kick can't take a die past the cap.
+		die.linear_velocity = (die.linear_velocity + dir * kick_speed * randf_range(0.6, 1.0)).limit_length(max_speed_in_cup)
+		die.apply_torque_impulse(_random_unit_vector() * kick_speed * kick_spin * die.mass)
 
 
 ## Caps a die's speed and puts it back in the middle if it escapes anyway.
@@ -112,6 +118,7 @@ func _contain(die: Die) -> void:
 	if die.linear_velocity.length() > max_speed_in_cup:
 		die.linear_velocity = die.linear_velocity.limit_length(max_speed_in_cup)
 	if not _inside.grow(0.3).has_point(die.global_position):
+		rescues += 1
 		die.global_position = _inside.get_center()
 		die.linear_velocity = Vector3.ZERO
 

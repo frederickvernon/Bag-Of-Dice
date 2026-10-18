@@ -2,7 +2,7 @@ class_name AppSettings
 extends RefCounted
 ## App-wide preferences, saved as JSON in user://settings.json:
 ##   { "version": 1, "sound": true, "haptics": true, "fast_roll": false, "tap_to_roll": true,
-##     "menu_button": false, "tutorial_done": false }
+##     "menu_button": false, "tutorial_done": false, "rethrow_mode": "clear", "manual_rethrow": false }
 
 const DEFAULT_PATH: String = "user://settings.json"
 const FORMAT_VERSION: int = 1
@@ -17,6 +17,10 @@ var fast_roll: bool = false
 var tap_to_roll: bool = true
 ## Show a menu button on the table (Back always works).
 var menu_button: bool = false
+## What happens to the other dice on a re-throw (a RethrowMode id); sets can override it.
+var rethrow_mode: String = RethrowMode.CLEAR
+## Re-roll by hand: dice that need re-throwing come back to the player's hand instead of being thrown automatically.
+var manual_rethrow: bool = false
 ## The first-run tips have been seen (cleared by "Show tips again").
 var tutorial_done: bool = false
 
@@ -37,10 +41,13 @@ func load_settings() -> void:
 	tap_to_roll = data.get("tap_to_roll", true) != false
 	menu_button = data.get("menu_button", false) == true
 	tutorial_done = data.get("tutorial_done", false) == true
+	rethrow_mode = RethrowMode.clean_global(data.get("rethrow_mode"))
+	manual_rethrow = data.get("manual_rethrow", false) == true
 
 
 func save() -> bool:
 	return JsonFile.write(path, {
 		"version": FORMAT_VERSION, "sound": sound, "haptics": haptics, "fast_roll": fast_roll,
 		"tap_to_roll": tap_to_roll, "menu_button": menu_button, "tutorial_done": tutorial_done,
+		"rethrow_mode": rethrow_mode, "manual_rethrow": manual_rethrow,
 	})

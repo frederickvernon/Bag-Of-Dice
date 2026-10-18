@@ -22,6 +22,19 @@ var _dice: Array[Dictionary] = []
 var _title: Label
 var _name_edit: LineEdit
 var _pick_toggle: CheckButton
+## The set's re-throw choice (a RethrowMode id or "default"); kept by Duplicate.
+var _rethrow_mode: String = RethrowMode.TABLE_DEFAULT
+## The global mode, named on the "Table default" choice. Kept up to date by the main screen.
+var global_rethrow_mode: String = RethrowMode.CLEAR:
+	set(value):
+		global_rethrow_mode = RethrowMode.clean_global(value)
+		_refresh_rethrow_option()
+var _rethrow_row: HBoxContainer
+var _rethrow_option: OptionButton
+## The editor's choices, in menu order.
+const RETHROW_CHOICES: Array[String] = [
+	RethrowMode.TABLE_DEFAULT, RethrowMode.LIVE, RethrowMode.COUNT, RethrowMode.CLEAR,
+]
 var _count_label: Label
 var _rows: VBoxContainer
 var _empty_hint: Label
@@ -83,6 +96,26 @@ func _ready() -> void:
 	_pick_toggle.add_theme_font_size_override("font_size", 26)
 	_pick_toggle.tooltip_text = "Choose which of the set's dice to throw each time, e.g. attack or defend dice"
 	column.add_child(_pick_toggle)
+
+	_rethrow_row = HBoxContainer.new()
+	_rethrow_row.add_theme_constant_override("separation", 12)
+	column.add_child(_rethrow_row)
+	var rethrow_label: Label = Label.new()
+	rethrow_label.text = "Re-throws"
+	rethrow_label.add_theme_font_size_override("font_size", 26)
+	_rethrow_row.add_child(rethrow_label)
+	_rethrow_option = OptionButton.new()
+	_rethrow_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_rethrow_option.custom_minimum_size.y = 68
+	_rethrow_option.clip_text = true
+	_rethrow_option.add_theme_font_size_override("font_size", 24)
+	_rethrow_option.get_popup().add_theme_font_size_override("font_size", 28)
+	for mode: String in RETHROW_CHOICES:
+		_rethrow_option.add_item(RethrowMode.NAMES[mode])
+	_rethrow_option.item_selected.connect(func(i: int) -> void: _rethrow_mode = RETHROW_CHOICES[i])
+	_rethrow_option.tooltip_text = "What happens to the other dice when one has to be re-thrown"
+	_rethrow_row.add_child(_rethrow_option)
+	_refresh_rethrow_option()
 
 	_count_label = _muted("")
 	column.add_child(_count_label)
@@ -164,6 +197,7 @@ func open(set_data: Dictionary) -> void:
 	_title.text = "New set" if _is_new else "Edit set"
 	_name_edit.text = "" if _is_new else str(set_data["name"])
 	_pick_toggle.button_pressed = set_data.get("pick_dice", false)
+	set_rethrow_mode(str(set_data.get("rethrow_mode", "")))
 	_dice.clear()
 	for d: Dictionary in set_data.get("dice", []):
 		_dice.append(d.duplicate())
@@ -173,6 +207,19 @@ func open(set_data: Dictionary) -> void:
 	visible = true
 	if _is_new:
 		_name_edit.grab_focus()
+
+
+func set_rethrow_mode(mode: String) -> void:
+	_rethrow_mode = RethrowMode.clean_set(mode)
+	if _rethrow_option != null:
+		_rethrow_option.select(RETHROW_CHOICES.find(_rethrow_mode))
+
+
+## "Table default" names the global mode it follows, e.g. "Table default (Clear the table)".
+func _refresh_rethrow_option() -> void:
+	if _rethrow_option != null:
+		_rethrow_option.set_item_text(0, "%s (%s)" % [RethrowMode.NAMES[RethrowMode.TABLE_DEFAULT],
+				RethrowMode.NAMES[global_rethrow_mode]])
 
 
 func open_quick() -> void:
@@ -208,6 +255,7 @@ func _set_quick(quick: bool) -> void:
 	_name_label.visible = not quick
 	_name_edit.visible = not quick
 	_pick_toggle.visible = not quick
+	_rethrow_row.visible = not quick
 	_save_button.text = "Roll" if quick else "Save"
 
 
@@ -228,7 +276,8 @@ func _save() -> void:
 		return
 	saved.emit({
 		"id": _set_id, "name": _name_edit.text.strip_edges(),
-		"pick_dice": _pick_toggle.button_pressed, "dice": _dice.duplicate(true),
+		"pick_dice": _pick_toggle.button_pressed, "rethrow_mode": _rethrow_mode,
+		"dice": _dice.duplicate(true),
 	})
 
 

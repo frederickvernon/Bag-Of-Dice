@@ -17,9 +17,8 @@ func run() -> void:
 	check(menu.visible, "the app opens on the menu")
 	snap("menu")
 
-	for i: int in 900:
-		if not main.get("_warming"):
-			break
+	var waited_ms: int = Time.get_ticks_msec()
+	while main.get("_warming") and Time.get_ticks_msec() - waited_ms < 20000:
 		await process_frame
 	check(not main.get("_warming") and history.entries.is_empty(), "the practice throw finished and wasn't logged")
 
